@@ -1,0 +1,77 @@
+/* ============================================
+   Source Editor (Raw Markdown)
+   ============================================ */
+
+.source-editor {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-editor);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+/* --- Line Numbers --- */
+.source-line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  min-width: 48px;
+  text-align: right;
+  overflow: hidden;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-light);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.source-line-number {
+  display: block;
+  padding: 0 12px 0 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.65;
+  height: calc(13.5px * 1.65);
+}
+
+/* --- Textarea --- */
+.source-textarea {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.65;
+  padding: 24px 24px 80px;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+  caret-color: var(--accent-primary);
+}
+
+.source-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* --- Selection --- */
+.source-textarea::selection {
+  background: var(--accent-primary-subtle);
+}
+
+/* Scrollbar for source editor */
+.source-textarea::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.source-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+.source-textarea::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: var(--radius-full);
+}

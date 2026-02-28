@@ -1,0 +1,39 @@
+/* ============================================
+   Editor Mode Toggle
+   ============================================ */
+
+.editor-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 1px;
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border-radius: var(--radius-xs);
+  color: var(--text-tertiary);
+  transition: all var(--transition-fast);
+}
+
+.mode-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-active);
+}
+
+.mode-btn--active {
+  color: var(--accent-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
+}
+
+.mode-btn--active:hover {
+  color: var(--accent-primary);
+  background: var(--bg-card);
+}

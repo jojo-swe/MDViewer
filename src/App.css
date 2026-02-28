@@ -37,6 +37,31 @@
   background: var(--bg-editor);
 }
 
+/* --- Split View --- */
+.split-view {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.split-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.split-divider {
+  width: 1px;
+  background: var(--border-medium);
+  flex-shrink: 0;
+}
+
+.split-pane--preview {
+  overflow-y: auto;
+}
+
 /* --- Milkdown Wrapper --- */
 .milkdown-wrapper {
   max-width: var(--editor-max-width);

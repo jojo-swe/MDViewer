@@ -14,6 +14,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { STRICTNESS_OPTIONS } from '../utils/linter';
+import EditorModeToggle from './EditorModeToggle';
 import './StatusBar.css';
 
 export default function StatusBar({
@@ -25,6 +26,8 @@ export default function StatusBar({
   onSetStrictness,
   lintEnabled,
   onToggleLint,
+  editorMode,
+  onSetEditorMode,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showStrictnessMenu, setShowStrictnessMenu] = useState(false);
@@ -187,6 +190,8 @@ export default function StatusBar({
         </div>
 
         <div className="status-bar-right">
+          <EditorModeToggle mode={editorMode} onModeChange={onSetEditorMode} />
+          <span className="status-divider" />
           <span className="status-stat">{wordCount} words</span>
           <span className="status-divider" />
           <span className="status-stat">{charCount} chars</span>

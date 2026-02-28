@@ -3,6 +3,7 @@ import TitleBar from './components/TitleBar';
 import TabBar from './components/TabBar';
 import Sidebar from './components/Sidebar';
 import MilkdownEditor from './components/MilkdownEditor';
+import SourceEditor from './components/SourceEditor';
 import FindReplace from './components/FindReplace';
 import WelcomeScreen from './components/WelcomeScreen';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -49,12 +50,19 @@ function App() {
   const [editorContentKey, setEditorContentKey] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
   const [confirmState, setConfirmState] = useState({ visible: false, tabId: null });
+  const [editorMode, setEditorMode] = useState(() => localStorage.getItem('mdviewer-editor-mode') || 'wysiwyg');
   const editorInstanceRef = useRef(null);
   const editorElementRef = useRef(null);
 
   const activeTabIdRef = useRef(activeId);
   const editorContent = activeTab?.content ?? '';
   const isEmptyEditor = tabs.length === 1 && !activeTab?.path && !activeTab?.content;
+
+  // Persist editor mode
+  const handleSetEditorMode = useCallback((mode) => {
+    setEditorMode(mode);
+    localStorage.setItem('mdviewer-editor-mode', mode);
+  }, []);
 
   useEffect(() => {
     if (activeTab && activeTabIdRef.current !== activeTab.id) {
@@ -75,6 +83,20 @@ function App() {
       if (md && showWelcome) setShowWelcome(false);
     },
     [updateContent, showWelcome]
+  );
+
+  // Source editor change handler — update content + bump WYSIWYG key for split mode
+  const handleSourceChange = useCallback(
+    (newContent) => {
+      if (activeTabIdRef.current) {
+        updateContent(activeTabIdRef.current, newContent);
+      }
+      if (editorMode === 'split') {
+        setEditorContentKey((k) => k + 1);
+      }
+      if (newContent && showWelcome) setShowWelcome(false);
+    },
+    [updateContent, editorMode, showWelcome]
   );
 
   // --- File Operations ---
@@ -160,7 +182,7 @@ function App() {
     setShowWelcome(false);
   }, [createTab]);
 
-  // --- Save-before-close logic ---
+  // --- Save-before-close ---
   const handleCloseTab = useCallback(
     (id) => {
       const tab = tabs.find((t) => t.id === id);
@@ -202,7 +224,7 @@ function App() {
     setConfirmState({ visible: false, tabId: null });
   }, []);
 
-  // --- Find & Replace callback ---
+  // --- Find & Replace ---
   const handleReplace = useCallback(
     (transformFn) => {
       if (!activeTab) return;
@@ -256,12 +278,19 @@ function App() {
         e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1);
       } else if (isMod && e.key === 'n') {
         e.preventDefault(); handleNewTab();
+      // Editor mode shortcuts: Ctrl+Alt+1/2/3
+      } else if (isMod && e.altKey && e.key === '1') {
+        e.preventDefault(); handleSetEditorMode('wysiwyg');
+      } else if (isMod && e.altKey && e.key === '2') {
+        e.preventDefault(); handleSetEditorMode('source');
+      } else if (isMod && e.altKey && e.key === '3') {
+        e.preventDefault(); handleSetEditorMode('split');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleOpen, handleSave, handleSaveAs, handleExportPDF, activeTab, handleCloseTab, cycleTab, handleNewTab]);
+  }, [handleOpen, handleSave, handleSaveAs, handleExportPDF, activeTab, handleCloseTab, cycleTab, handleNewTab, handleSetEditorMode]);
 
   // --- Drag & Drop ---
   useEffect(() => {
@@ -288,6 +317,65 @@ function App() {
   }, [openInTab, toast]);
 
   const showTitleBar = isDesktopApp();
+
+  // --- Render the editor area based on mode ---
+  const renderEditor = () => {
+    if (showWelcome && isEmptyEditor) {
+      return (
+        <WelcomeScreen
+          recentFiles={recentFiles}
+          onOpenFile={handleOpen}
+          onOpenRecent={handleOpenRecent}
+          onNewFile={handleNewTab}
+          onClearRecent={clearRecentFiles}
+        />
+      );
+    }
+
+    switch (editorMode) {
+      case 'source':
+        return (
+          <SourceEditor
+            value={editorContent}
+            onChange={handleSourceChange}
+          />
+        );
+
+      case 'split':
+        return (
+          <div className="split-view">
+            <div className="split-pane split-pane--source">
+              <SourceEditor
+                value={editorContent}
+                onChange={handleSourceChange}
+              />
+            </div>
+            <div className="split-divider" />
+            <div className="split-pane split-pane--preview">
+              <MilkdownEditor
+                key={editorContentKey}
+                theme={theme}
+                onMarkdownChange={handleMarkdownChange}
+                externalContent={editorContent}
+                editorInstanceRef={editorInstanceRef}
+              />
+            </div>
+          </div>
+        );
+
+      case 'wysiwyg':
+      default:
+        return (
+          <MilkdownEditor
+            key={editorContentKey}
+            theme={theme}
+            onMarkdownChange={handleMarkdownChange}
+            externalContent={editorContent}
+            editorInstanceRef={editorInstanceRef}
+          />
+        );
+    }
+  };
 
   return (
     <div className="app" data-theme={theme}>
@@ -320,23 +408,7 @@ function App() {
             containerRef={editorElementRef}
             onReplace={handleReplace}
           />
-          {showWelcome && isEmptyEditor ? (
-            <WelcomeScreen
-              recentFiles={recentFiles}
-              onOpenFile={handleOpen}
-              onOpenRecent={handleOpenRecent}
-              onNewFile={handleNewTab}
-              onClearRecent={clearRecentFiles}
-            />
-          ) : (
-            <MilkdownEditor
-              key={editorContentKey}
-              theme={theme}
-              onMarkdownChange={handleMarkdownChange}
-              externalContent={editorContent}
-              editorInstanceRef={editorInstanceRef}
-            />
-          )}
+          {renderEditor()}
         </div>
       </div>
 
@@ -349,9 +421,10 @@ function App() {
         onSetStrictness={setStrictness}
         lintEnabled={lintEnabled}
         onToggleLint={toggleLint}
+        editorMode={editorMode}
+        onSetEditorMode={handleSetEditorMode}
       />
 
-      {/* Modals & Overlays */}
       <ConfirmDialog
         visible={confirmState.visible}
         title="Unsaved Changes"
