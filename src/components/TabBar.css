@@ -1,0 +1,138 @@
+/* ============================================
+   Tab Bar Styles
+   ============================================ */
+
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-light);
+  height: 36px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tabbar-scroll {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tabbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- Individual Tab --- */
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  min-width: 100px;
+  max-width: 200px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-light);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tab--active {
+  color: var(--text-primary);
+  background: var(--bg-editor);
+  font-weight: 600;
+}
+
+/* Active tab bottom accent line */
+.tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+/* --- Tab Icon --- */
+.tab-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.tab--active .tab-icon {
+  opacity: 0.8;
+  color: var(--accent-primary);
+}
+
+/* --- Tab Label --- */
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Dirty Dot --- */
+.tab-dirty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent-warning);
+  flex-shrink: 0;
+}
+
+/* --- Tab Close Button --- */
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+.tab:hover .tab-close,
+.tab--active .tab-close {
+  opacity: 0.6;
+}
+.tab-close:hover {
+  opacity: 1 !important;
+  background: var(--bg-active);
+}
+
+/* --- New Tab Button --- */
+.tab-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.tab-new:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

@@ -19,6 +19,24 @@
   padding-bottom: calc(var(--status-bar-height) + 8px);
 }
 
+/* --- App Body (Sidebar + Editor) --- */
+.app-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* --- Editor Pane --- */
+.editor-pane {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-editor);
+}
+
 /* --- Milkdown Wrapper --- */
 .milkdown-wrapper {
   max-width: var(--editor-max-width);
