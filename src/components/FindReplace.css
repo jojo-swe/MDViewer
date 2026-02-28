@@ -134,6 +134,14 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+.find-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.find-action-btn:disabled:hover {
+  background: none;
+  color: var(--text-secondary);
+}
 
 /* --- CSS Highlight API Styles --- */
 ::highlight(search-results) {

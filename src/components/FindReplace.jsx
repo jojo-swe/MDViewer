@@ -2,7 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Replace, X, ChevronDown, ChevronUp } from 'lucide-react';
 import './FindReplace.css';
 
-export default function FindReplace({ visible, onClose, containerRef }) {
+/**
+ * Find & Replace panel with CSS Highlight API match highlighting.
+ * Props: visible, onClose, containerRef, onReplace (callback with new full markdown)
+ */
+export default function FindReplace({ visible, onClose, containerRef, onReplace }) {
   const [editorElement, setEditorElement] = useState(null);
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
@@ -12,119 +16,153 @@ export default function FindReplace({ visible, onClose, containerRef }) {
   const [matchCount, setMatchCount] = useState(0);
   const [currentMatch, setCurrentMatch] = useState(0);
   const inputRef = useRef(null);
+  const matchRangesRef = useRef([]);
 
   useEffect(() => {
     if (visible && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
-    // Resolve the ProseMirror element from the container ref
     if (visible && containerRef?.current) {
       const el = containerRef.current.querySelector('.ProseMirror');
       setEditorElement(el);
     }
   }, [visible, containerRef]);
 
-  // Highlight matches in editor using browser's native find
+  // Build the search regex from current settings
+  const buildPattern = useCallback(() => {
+    if (!query) return null;
+    try {
+      const flags = caseSensitive ? 'g' : 'gi';
+      return useRegex
+        ? new RegExp(query, flags)
+        : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+    } catch {
+      return null;
+    }
+  }, [query, caseSensitive, useRegex]);
+
+  // Highlight matches using CSS Highlight API
   const doSearch = useCallback(() => {
+    matchRangesRef.current = [];
+
     if (!query || !editorElement) {
       setMatchCount(0);
       setCurrentMatch(0);
+      if (window.CSS?.highlights) {
+        CSS.highlights.delete('search-results');
+        CSS.highlights.delete('search-current');
+      }
       return;
     }
 
-    // Clear previous highlights
-    if (window.CSS && CSS.highlights) {
+    if (window.CSS?.highlights) {
       CSS.highlights.delete('search-results');
       CSS.highlights.delete('search-current');
     }
 
     try {
-      const treeWalker = document.createTreeWalker(
-        editorElement,
-        NodeFilter.SHOW_TEXT,
-        null
-      );
-
+      const treeWalker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT, null);
       const textNodes = [];
-      let currentNode = treeWalker.nextNode();
-      while (currentNode) {
-        textNodes.push(currentNode);
-        currentNode = treeWalker.nextNode();
+      let node = treeWalker.nextNode();
+      while (node) {
+        textNodes.push(node);
+        node = treeWalker.nextNode();
       }
+
+      const pattern = buildPattern();
+      if (!pattern) { setMatchCount(0); return; }
 
       const ranges = [];
-      const flags = caseSensitive ? (useRegex ? 'g' : 'g') : (useRegex ? 'gi' : 'gi');
-
-      let searchPattern;
-      try {
-        searchPattern = useRegex ? new RegExp(query, flags) : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
-      } catch {
-        setMatchCount(0);
-        return;
-      }
-
-      for (const node of textNodes) {
-        const text = node.textContent;
+      for (const textNode of textNodes) {
+        const text = textNode.textContent;
         let match;
-        searchPattern.lastIndex = 0;
-        while ((match = searchPattern.exec(text)) !== null) {
+        pattern.lastIndex = 0;
+        while ((match = pattern.exec(text)) !== null) {
           const range = new Range();
-          range.setStart(node, match.index);
-          range.setEnd(node, match.index + match[0].length);
+          range.setStart(textNode, match.index);
+          range.setEnd(textNode, match.index + match[0].length);
           ranges.push(range);
-          if (match[0].length === 0) break; // Prevent infinite loop
+          if (match[0].length === 0) break;
         }
       }
 
+      matchRangesRef.current = ranges;
       setMatchCount(ranges.length);
       setCurrentMatch(ranges.length > 0 ? 1 : 0);
 
-      // Use CSS Highlight API if available
-      if (ranges.length > 0 && window.CSS && CSS.highlights) {
-        const highlight = new Highlight(...ranges);
-        CSS.highlights.set('search-results', highlight);
+      if (ranges.length > 0 && window.CSS?.highlights) {
+        CSS.highlights.set('search-results', new Highlight(...ranges));
 
-        // Scroll first match into view
-        const firstRange = ranges[0];
-        const rect = firstRange.getBoundingClientRect();
-        if (rect) {
-          const container = editorElement.closest('.editor-container');
-          if (container) {
-            const containerRect = container.getBoundingClientRect();
-            if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
-              firstRange.startContainer.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }
+        // Highlight current match
+        const currentRange = ranges[0];
+        if (currentRange) {
+          CSS.highlights.set('search-current', new Highlight(currentRange));
+          currentRange.startContainer.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     } catch (err) {
       console.error('Search error:', err);
     }
-  }, [query, caseSensitive, useRegex, editorElement]);
+  }, [query, caseSensitive, useRegex, editorElement, buildPattern]);
 
   useEffect(() => {
     const timer = setTimeout(doSearch, 200);
     return () => clearTimeout(timer);
   }, [doSearch]);
 
-  // Clean up highlights on close
+  // Clean up on close
   useEffect(() => {
-    if (!visible && window.CSS && CSS.highlights) {
+    if (!visible && window.CSS?.highlights) {
       CSS.highlights.delete('search-results');
       CSS.highlights.delete('search-current');
     }
   }, [visible]);
+
+  // Navigate between matches
+  const goToMatch = useCallback((index) => {
+    const ranges = matchRangesRef.current;
+    if (ranges.length === 0) return;
+    const i = ((index - 1) % ranges.length + ranges.length) % ranges.length;
+    setCurrentMatch(i + 1);
+    if (window.CSS?.highlights && ranges[i]) {
+      CSS.highlights.set('search-current', new Highlight(ranges[i]));
+      ranges[i].startContainer.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
+  // Replace: use the onReplace callback to do a string replace in the markdown source
+  const handleReplace = useCallback(() => {
+    if (!query || !onReplace) return;
+    onReplace((markdown) => {
+      const pattern = buildPattern();
+      if (!pattern) return markdown;
+      // Replace only the first occurrence
+      pattern.lastIndex = 0;
+      const match = pattern.exec(markdown);
+      if (!match) return markdown;
+      return markdown.substring(0, match.index) + replacement + markdown.substring(match.index + match[0].length);
+    });
+  }, [query, replacement, buildPattern, onReplace]);
+
+  const handleReplaceAll = useCallback(() => {
+    if (!query || !onReplace) return;
+    onReplace((markdown) => {
+      const pattern = buildPattern();
+      if (!pattern) return markdown;
+      return markdown.replace(pattern, replacement);
+    });
+  }, [query, replacement, buildPattern, onReplace]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') {
       onClose();
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      // Next match
-      if (matchCount > 0) {
-        setCurrentMatch((prev) => (prev % matchCount) + 1);
-      }
+      goToMatch(currentMatch + 1);
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      goToMatch(currentMatch - 1);
     }
   };
 
@@ -173,7 +211,7 @@ export default function FindReplace({ visible, onClose, containerRef }) {
             {showReplace ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
         </div>
-        <button className="find-close" onClick={onClose} title="Close">
+        <button className="find-close" onClick={onClose} title="Close (Esc)">
           <X size={14} />
         </button>
       </div>
@@ -192,10 +230,10 @@ export default function FindReplace({ visible, onClose, containerRef }) {
             />
           </div>
           <div className="find-replace-actions">
-            <button className="find-action-btn" title="Replace">
+            <button className="find-action-btn" onClick={handleReplace} title="Replace (single)" disabled={matchCount === 0}>
               Replace
             </button>
-            <button className="find-action-btn" title="Replace All">
+            <button className="find-action-btn" onClick={handleReplaceAll} title="Replace All" disabled={matchCount === 0}>
               All
             </button>
           </div>

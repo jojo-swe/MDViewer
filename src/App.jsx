@@ -5,11 +5,14 @@ import Sidebar from './components/Sidebar';
 import MilkdownEditor from './components/MilkdownEditor';
 import FindReplace from './components/FindReplace';
 import WelcomeScreen from './components/WelcomeScreen';
+import ConfirmDialog from './components/ConfirmDialog';
+import ToastContainer from './components/ToastContainer';
 import StatusBar from './components/StatusBar';
 import { useTheme } from './hooks/useTheme';
 import { useLinter } from './hooks/useLinter';
 import { useTabs } from './hooks/useTabs';
 import { useRecentFiles } from './hooks/useRecentFiles';
+import { useToast } from './hooks/useToast';
 import { openFile, saveFile, saveFileAs, getFileName, isDesktopApp } from './utils/fileManager';
 import { exportToPDF } from './utils/pdfExport';
 import './App.css';
@@ -39,19 +42,18 @@ function App() {
   } = useTabs();
 
   const { recentFiles, addFile, clearAll: clearRecentFiles } = useRecentFiles();
+  const toast = useToast();
 
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [findVisible, setFindVisible] = useState(false);
   const [editorContentKey, setEditorContentKey] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [confirmState, setConfirmState] = useState({ visible: false, tabId: null });
   const editorInstanceRef = useRef(null);
   const editorElementRef = useRef(null);
 
   const activeTabIdRef = useRef(activeId);
   const editorContent = activeTab?.content ?? '';
-
-  // Determine if we should show the welcome screen
-  // Show it when there's only one tab and it has no content and no path
   const isEmptyEditor = tabs.length === 1 && !activeTab?.path && !activeTab?.content;
 
   useEffect(() => {
@@ -70,15 +72,12 @@ function App() {
       if (activeTabIdRef.current) {
         updateContent(activeTabIdRef.current, md);
       }
-      // Hide welcome screen once user starts typing
-      if (md && showWelcome) {
-        setShowWelcome(false);
-      }
+      if (md && showWelcome) setShowWelcome(false);
     },
     [updateContent, showWelcome]
   );
 
-  // File Operations
+  // --- File Operations ---
   const handleOpen = useCallback(async () => {
     try {
       const result = await openFile();
@@ -86,33 +85,30 @@ function App() {
         openInTab(result.path, result.content);
         addFile(result.path, getFileName(result.path));
         setShowWelcome(false);
+        toast.success(`Opened ${getFileName(result.path)}`);
       }
     } catch (err) {
-      console.error('Failed to open file:', err);
+      toast.error(`Failed to open file: ${err.message}`);
     }
-  }, [openInTab, addFile]);
+  }, [openInTab, addFile, toast]);
 
   const handleOpenRecent = useCallback(
     async (path) => {
       try {
-        // Try reading the file via Tauri or fallback
         let tauriFs;
-        try {
-          tauriFs = await import('@tauri-apps/plugin-fs');
-        } catch {
-          // Not in Tauri
-        }
+        try { tauriFs = await import('@tauri-apps/plugin-fs'); } catch { /* browser */ }
         if (tauriFs) {
           const content = await tauriFs.readTextFile(path);
           openInTab(path, content);
           addFile(path, getFileName(path));
           setShowWelcome(false);
+          toast.success(`Opened ${getFileName(path)}`);
         }
       } catch (err) {
-        console.error('Failed to open recent file:', err);
+        toast.error(`Failed to open: ${err.message}`);
       }
     },
-    [openInTab, addFile]
+    [openInTab, addFile, toast]
   );
 
   const handleSave = useCallback(async () => {
@@ -122,17 +118,20 @@ function App() {
       if (activeTab.path) {
         await saveFile(activeTab.path, currentContent);
         markSaved(activeTab.id, activeTab.path, currentContent);
+        addFile(activeTab.path, getFileName(activeTab.path));
+        toast.success(`Saved ${getFileName(activeTab.path)}`);
       } else {
         const savedPath = await saveFileAs(currentContent);
         if (savedPath) {
           markSaved(activeTab.id, savedPath, currentContent);
           addFile(savedPath, getFileName(savedPath));
+          toast.success(`Saved as ${getFileName(savedPath)}`);
         }
       }
     } catch (err) {
-      console.error('Failed to save file:', err);
+      toast.error(`Save failed: ${err.message}`);
     }
-  }, [activeTab, markSaved, addFile]);
+  }, [activeTab, markSaved, addFile, toast]);
 
   const handleSaveAs = useCallback(async () => {
     if (!activeTab) return;
@@ -142,16 +141,18 @@ function App() {
       if (savedPath) {
         markSaved(activeTab.id, savedPath, currentContent);
         addFile(savedPath, getFileName(savedPath));
+        toast.success(`Saved as ${getFileName(savedPath)}`);
       }
     } catch (err) {
-      console.error('Failed to save file:', err);
+      toast.error(`Save failed: ${err.message}`);
     }
-  }, [activeTab, markSaved, addFile]);
+  }, [activeTab, markSaved, addFile, toast]);
 
   const handleExportPDF = useCallback(() => {
     const title = getFileName(activeTab?.path) || 'Untitled';
     exportToPDF(title);
-  }, [activeTab?.path]);
+    toast.info('Opening print dialog for PDF export...');
+  }, [activeTab?.path, toast]);
 
   const handleNewTab = useCallback(() => {
     createTab();
@@ -159,19 +160,64 @@ function App() {
     setShowWelcome(false);
   }, [createTab]);
 
+  // --- Save-before-close logic ---
   const handleCloseTab = useCallback(
     (id) => {
-      closeTab(id);
+      const tab = tabs.find((t) => t.id === id);
+      if (tab?.isDirty) {
+        setConfirmState({ visible: true, tabId: id });
+      } else {
+        closeTab(id);
+      }
     },
-    [closeTab]
+    [tabs, closeTab]
   );
 
-  const handleSwitchTab = useCallback(
-    (id) => {
-      switchTab(id);
+  const handleConfirmSave = useCallback(async () => {
+    const tabId = confirmState.tabId;
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab) {
+      try {
+        if (tab.path) {
+          await saveFile(tab.path, tab.content);
+          toast.success(`Saved ${getFileName(tab.path)}`);
+        } else {
+          const savedPath = await saveFileAs(tab.content);
+          if (savedPath) toast.success(`Saved as ${getFileName(savedPath)}`);
+        }
+      } catch (err) {
+        toast.error(`Save failed: ${err.message}`);
+      }
+    }
+    closeTab(tabId);
+    setConfirmState({ visible: false, tabId: null });
+  }, [confirmState.tabId, tabs, closeTab, toast]);
+
+  const handleConfirmDiscard = useCallback(() => {
+    closeTab(confirmState.tabId);
+    setConfirmState({ visible: false, tabId: null });
+  }, [confirmState.tabId, closeTab]);
+
+  const handleConfirmCancel = useCallback(() => {
+    setConfirmState({ visible: false, tabId: null });
+  }, []);
+
+  // --- Find & Replace callback ---
+  const handleReplace = useCallback(
+    (transformFn) => {
+      if (!activeTab) return;
+      const currentMarkdown = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
+      const newMarkdown = transformFn(currentMarkdown);
+      if (newMarkdown !== currentMarkdown) {
+        updateContent(activeTab.id, newMarkdown);
+        setEditorContentKey((k) => k + 1);
+        toast.info('Replaced');
+      }
     },
-    [switchTab]
+    [activeTab, updateContent, toast]
   );
+
+  const handleSwitchTab = useCallback((id) => switchTab(id), [switchTab]);
 
   const handleSidebarFileOpen = useCallback(
     (path, content) => {
@@ -182,57 +228,44 @@ function App() {
     [openInTab, addFile]
   );
 
-  // Keyboard shortcuts
+  // --- Keyboard shortcuts ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isMod = e.ctrlKey || e.metaKey;
 
       if (isMod && e.key === 'o') {
-        e.preventDefault();
-        handleOpen();
+        e.preventDefault(); handleOpen();
       } else if (isMod && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
-        e.preventDefault();
-        handleExportPDF();
+        e.preventDefault(); handleExportPDF();
       } else if (isMod && e.shiftKey && (e.key === 'S' || e.key === 's')) {
-        e.preventDefault();
-        handleSaveAs();
+        e.preventDefault(); handleSaveAs();
       } else if (isMod && e.key === 's') {
-        e.preventDefault();
-        handleSave();
+        e.preventDefault(); handleSave();
       } else if (isMod && e.key === 'b') {
-        e.preventDefault();
-        setSidebarVisible((v) => !v);
+        e.preventDefault(); setSidebarVisible((v) => !v);
       } else if (isMod && e.key === 'f') {
-        e.preventDefault();
-        setFindVisible(true);
+        e.preventDefault(); setFindVisible(true);
       } else if (isMod && e.key === 'h') {
-        e.preventDefault();
-        setFindVisible(true);
+        e.preventDefault(); setFindVisible(true);
       } else if (isMod && e.key === 'w') {
         e.preventDefault();
-        if (activeTab) closeTab(activeTab.id);
+        if (activeTab) handleCloseTab(activeTab.id);
       } else if (e.key === 'Escape') {
         setFindVisible(false);
       } else if (isMod && e.key === 'Tab') {
-        e.preventDefault();
-        cycleTab(e.shiftKey ? -1 : 1);
+        e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1);
       } else if (isMod && e.key === 'n') {
-        e.preventDefault();
-        handleNewTab();
+        e.preventDefault(); handleNewTab();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleOpen, handleSave, handleSaveAs, handleExportPDF, activeTab, closeTab, cycleTab, handleNewTab]);
+  }, [handleOpen, handleSave, handleSaveAs, handleExportPDF, activeTab, handleCloseTab, cycleTab, handleNewTab]);
 
-  // Drag & Drop support
+  // --- Drag & Drop ---
   useEffect(() => {
-    const handleDragOver = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
+    const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
     const handleDrop = async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -242,17 +275,17 @@ function App() {
           const content = await file.text();
           openInTab(file.name, content);
           setShowWelcome(false);
+          toast.success(`Opened ${file.name}`);
         }
       }
     };
-
     window.addEventListener('dragover', handleDragOver);
     window.addEventListener('drop', handleDrop);
     return () => {
       window.removeEventListener('dragover', handleDragOver);
       window.removeEventListener('drop', handleDrop);
     };
-  }, [openInTab]);
+  }, [openInTab, toast]);
 
   const showTitleBar = isDesktopApp();
 
@@ -285,6 +318,7 @@ function App() {
             visible={findVisible}
             onClose={() => setFindVisible(false)}
             containerRef={editorElementRef}
+            onReplace={handleReplace}
           />
           {showWelcome && isEmptyEditor ? (
             <WelcomeScreen
@@ -316,6 +350,18 @@ function App() {
         lintEnabled={lintEnabled}
         onToggleLint={toggleLint}
       />
+
+      {/* Modals & Overlays */}
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title="Unsaved Changes"
+        message={`"${getFileName(tabs.find((t) => t.id === confirmState.tabId)?.path) || 'Untitled'}" has unsaved changes. Save before closing?`}
+        onConfirm={handleConfirmSave}
+        onDanger={handleConfirmDiscard}
+        onCancel={handleConfirmCancel}
+      />
+
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
     </div>
   );
 }
