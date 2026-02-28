@@ -1,0 +1,105 @@
+/* ============================================
+   Custom Title Bar Styles
+   ============================================ */
+
+.titlebar {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-light);
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+  z-index: var(--z-header);
+  position: relative;
+}
+
+/* --- Left Section --- */
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  min-width: 120px;
+}
+
+.titlebar-app-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+  opacity: 0.9;
+}
+
+.titlebar-brand {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* --- Center Section --- */
+.titlebar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.titlebar-filename {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-filename.dirty {
+  color: var(--accent-warning);
+}
+
+/* --- Window Controls --- */
+.titlebar-controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.titlebar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.titlebar-btn--close:hover {
+  background: #e81123;
+  color: #ffffff;
+}
+
+/* --- Platform-specific drag area --- */
+.titlebar {
+  -webkit-app-region: drag;
+}
+
+.titlebar-btn,
+.titlebar-left {
+  -webkit-app-region: no-drag;
+}

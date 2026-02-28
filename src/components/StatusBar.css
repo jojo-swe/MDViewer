@@ -1,0 +1,289 @@
+/* ============================================
+   StatusBar & Lint Panel Styles
+   ============================================ */
+
+/* --- Status Bar --- */
+.status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--status-bar-height);
+  background: var(--bg-status);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: var(--z-header);
+  font-size: 12px;
+  color: var(--text-secondary);
+  animation: fadeIn var(--transition-normal);
+}
+
+.status-bar-left,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Status Button --- */
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.status-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.status-lint-toggle.active {
+  color: var(--accent-primary);
+}
+
+/* --- Theme Toggle --- */
+.status-theme-toggle {
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+}
+.status-theme-toggle:hover {
+  background: var(--bg-hover);
+}
+
+/* --- Stats --- */
+.status-stat {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.status-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--border-light);
+  margin: 0 4px;
+}
+
+/* --- Status Clean Badge --- */
+.status-clean {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--accent-success);
+  font-weight: 500;
+  padding: 2px 6px;
+}
+
+/* --- Issue Badges --- */
+.status-issues {
+  gap: 6px;
+}
+.issue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.issue-badge--error { color: var(--lint-error); }
+.issue-badge--warning { color: var(--lint-warning); }
+.issue-badge--info { color: var(--lint-info); }
+
+/* --- Strictness Dot --- */
+.strictness-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+.strictness-dot--relaxed { background: var(--accent-success); }
+.strictness-dot--standard { background: var(--accent-warning); }
+.strictness-dot--strict { background: var(--lint-error); }
+
+/* --- Strictness Menu --- */
+.status-strictness-wrapper {
+  position: relative;
+}
+.strictness-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  z-index: var(--z-tooltip);
+  animation: scaleIn var(--transition-fast);
+  transform-origin: bottom left;
+}
+.strictness-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+.strictness-option:hover {
+  background: var(--bg-hover);
+}
+.strictness-option.active {
+  background: var(--accent-primary-subtle);
+}
+.strictness-option-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.strictness-option-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.strictness-option-count {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+.strictness-option-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding-left: 13px;
+}
+
+/* ============================================
+   Lint Panel (Expandable)
+   ============================================ */
+.lint-panel {
+  position: fixed;
+  bottom: var(--status-bar-height);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  background: var(--bg-lint-panel);
+  border-top: 1px solid var(--border-light);
+  z-index: calc(var(--z-header) - 1);
+  display: flex;
+  flex-direction: column;
+  animation: fadeInUp var(--transition-normal);
+  box-shadow: var(--shadow-md);
+}
+
+.lint-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+.lint-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.lint-panel-count {
+  background: var(--accent-primary-subtle);
+  color: var(--accent-primary);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.lint-panel-close {
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  color: var(--text-tertiary);
+  transition: all var(--transition-fast);
+}
+.lint-panel-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.lint-panel-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.lint-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--accent-success);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* --- Issue List --- */
+.lint-issue-list {
+  list-style: none;
+  padding: 4px 6px;
+}
+.lint-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  transition: background var(--transition-fast);
+  cursor: default;
+}
+.lint-issue:hover {
+  background: var(--bg-hover);
+}
+
+.lint-issue-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.lint-issue--error .lint-issue-icon { color: var(--lint-error); }
+.lint-issue--warning .lint-issue-icon { color: var(--lint-warning); }
+.lint-issue--info .lint-issue-icon { color: var(--lint-info); }
+
+.lint-issue-location {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  min-width: 32px;
+}
+.lint-issue-message {
+  flex: 1;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.lint-issue-rule {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  font-weight: 500;
+}
