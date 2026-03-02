@@ -15,6 +15,7 @@ export default function FindReplace({ visible, onClose, containerRef, onReplace 
   const [useRegex, setUseRegex] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
   const [currentMatch, setCurrentMatch] = useState(0);
+  const [regexError, setRegexError] = useState(null);
   const inputRef = useRef(null);
   const matchRangesRef = useRef([]);
 
@@ -34,10 +35,13 @@ export default function FindReplace({ visible, onClose, containerRef, onReplace 
     if (!query) return null;
     try {
       const flags = caseSensitive ? 'g' : 'gi';
-      return useRegex
+      const pattern = useRegex
         ? new RegExp(query, flags)
         : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
-    } catch {
+      setRegexError(null);
+      return pattern;
+    } catch (err) {
+      if (useRegex) setRegexError(err.message);
       return null;
     }
   }, [query, caseSensitive, useRegex]);
@@ -215,6 +219,12 @@ export default function FindReplace({ visible, onClose, containerRef, onReplace 
           <X size={14} />
         </button>
       </div>
+
+      {useRegex && regexError && (
+        <div className="find-regex-error" title={regexError}>
+          Invalid regex: {regexError}
+        </div>
+      )}
 
       {showReplace && (
         <div className="find-replace-row find-replace-row--replace">

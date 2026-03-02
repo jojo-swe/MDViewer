@@ -39,7 +39,7 @@ console.log(greet("World"));
 | WYSIWYG | ✅ Ready |
 | Linting | ✅ Ready |
 | Dark Mode | ✅ Ready |
-| Split View | 🔜 Coming |
+| Split View | ✅ Ready |
 
 > **Tip:** Use the toolbar at the bottom to toggle linting, switch themes, or check your word count.
 
