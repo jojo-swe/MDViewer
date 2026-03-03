@@ -12,6 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Added
 - Pre-commit hook via husky v9 — `npm run lint` must pass before any commit is accepted
 - Syntax highlighting in Source editor — highlight.js (core + markdown language only, ~45 KB) renders a colour-coded overlay behind the transparent textarea; headings, bold/italic, inline code, fenced code blocks, links, and list bullets are all coloured using the app's existing CSS design tokens so both light and dark themes work automatically
+- Tab drag-and-drop reordering — tabs can now be dragged to any position in the tab bar using the native HTML5 drag API (no new dependencies); the dragged tab fades to 45% opacity and a left accent bar highlights the drop target
 
 ### Fixed
 - Welcome content table incorrectly labelled Split View as "Coming" — it is fully shipped

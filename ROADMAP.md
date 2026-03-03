@@ -34,7 +34,7 @@ Quick-win fixes and documentation alignment.
 Stability improvements and frequently-requested UX additions.
 
 - [x] **Syntax highlighting in Source editor** — Integrate CodeMirror 6 or highlight.js for language-aware colouring in raw markdown mode
-- [ ] **Tab drag-and-drop reordering** — The `reorderTabs` hook already exists; add the drag UI to `TabBar`
+- [x] **Tab drag-and-drop reordering** — The `reorderTabs` hook already exists; add the drag UI to `TabBar`
 - [ ] **Word wrap toggle** — Per-mode setting to enable/disable soft wrapping in Source editor
 - [ ] **Auto-save** — Configurable interval (e.g. every 30 s) with a subtle status indicator
 - [ ] **File System Access API for web** — Replace the forced-download fallback with a proper browser save dialog using the File System Access API

@@ -40,6 +40,7 @@ function App() {
     markSaved,
     openInTab,
     cycleTab,
+    reorderTabs,
   } = useTabs();
 
   const { recentFiles, addFile, clearAll: clearRecentFiles } = useRecentFiles();
@@ -391,6 +392,7 @@ function App() {
         onSwitch={handleSwitchTab}
         onClose={handleCloseTab}
         onNew={handleNewTab}
+        onReorder={reorderTabs}
       />
 
       <div className="app-body">
