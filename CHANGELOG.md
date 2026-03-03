@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Pre-commit hook via husky v9 — `npm run lint` must pass before any commit is accepted
+- Syntax highlighting in Source editor — highlight.js (core + markdown language only, ~45 KB) renders a colour-coded overlay behind the transparent textarea; headings, bold/italic, inline code, fenced code blocks, links, and list bullets are all coloured using the app's existing CSS design tokens so both light and dark themes work automatically
 
 ### Fixed
 - Welcome content table incorrectly labelled Split View as "Coming" — it is fully shipped

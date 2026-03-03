@@ -36,14 +36,54 @@
   height: calc(13.5px * 1.65);
 }
 
-/* --- Textarea --- */
-.source-textarea {
+/* --- Textarea wrapper (positions highlight pre + textarea) --- */
+.source-textarea-wrapper {
+  position: relative;
   flex: 1;
+  overflow: hidden;
+}
+
+/* --- Syntax highlight overlay (sits behind the textarea) --- */
+.source-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 24px 24px 80px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre;
+  tab-size: 2;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text-primary);
+  background: transparent;
+  word-break: normal;
+  overflow-wrap: normal;
+  border: none;
+}
+
+/* Markdown token colours — use app design tokens, no external theme */
+.source-highlight .hljs-section   { color: var(--accent-primary); font-weight: 700; }
+.source-highlight .hljs-strong    { color: var(--text-primary); font-weight: 700; }
+.source-highlight .hljs-emphasis  { color: var(--text-secondary); font-style: italic; }
+.source-highlight .hljs-code      { color: var(--color-success, #34d399); }
+.source-highlight .hljs-link      { color: var(--accent-secondary, #818cf8); }
+.source-highlight .hljs-string    { color: var(--accent-secondary, #818cf8); }
+.source-highlight .hljs-comment   { color: var(--text-tertiary); font-style: italic; }
+.source-highlight .hljs-bullet    { color: var(--accent-primary); }
+.source-highlight .hljs-meta      { color: var(--text-tertiary); }
+
+/* --- Textarea (transparent text — highlight pre shows the colours) --- */
+.source-textarea {
+  position: absolute;
+  inset: 0;
   resize: none;
   border: none;
   outline: none;
   background: transparent;
-  color: var(--text-primary);
+  color: transparent;
+  caret-color: var(--accent-primary);
   font-family: var(--font-mono);
   font-size: 13.5px;
   line-height: 1.65;
@@ -51,7 +91,6 @@
   tab-size: 2;
   white-space: pre;
   overflow: auto;
-  caret-color: var(--accent-primary);
 }
 
 .source-textarea::placeholder {
@@ -61,6 +100,7 @@
 /* --- Selection --- */
 .source-textarea::selection {
   background: var(--accent-primary-subtle);
+  color: transparent;
 }
 
 /* Scrollbar for source editor */

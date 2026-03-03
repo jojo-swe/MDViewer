@@ -1,20 +1,40 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
+import hljs from 'highlight.js/lib/core';
+import markdownLang from 'highlight.js/lib/languages/markdown';
 import './SourceEditor.css';
 
+hljs.registerLanguage('markdown', markdownLang);
+
 /**
- * Raw markdown source editor with monospace styling, line numbers, and tab support.
- * Props: value, onChange, theme
+ * Raw markdown source editor with monospace styling, line numbers, tab support,
+ * and syntax highlighting via a highlight.js overlay.
+ * Props: value, onChange
  */
 export default function SourceEditor({ value, onChange }) {
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
+  const preRef = useRef(null);
+  const [highlightedHtml, setHighlightedHtml] = useState('');
 
   const lineCount = (value || '').split('\n').length;
 
-  // Sync scroll between line numbers and textarea
+  // Debounced syntax highlighting — 50ms so typing is never blocked
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const { value: html } = hljs.highlight(value || '', { language: 'markdown' });
+      setHighlightedHtml(html);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [value]);
+
+  // Sync scroll between line numbers, highlight pre, and textarea
   const handleScroll = useCallback(() => {
     if (lineNumbersRef.current && textareaRef.current) {
       lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+    if (preRef.current && textareaRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop;
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
     }
   }, []);
 
@@ -57,19 +77,27 @@ export default function SourceEditor({ value, onChange }) {
           </span>
         ))}
       </div>
-      <textarea
-        ref={textareaRef}
-        className="source-textarea"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        spellCheck={false}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        data-gramm="false"
-        id="source-textarea"
-      />
+      <div className="source-textarea-wrapper">
+        <pre
+          ref={preRef}
+          className="source-highlight"
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+        />
+        <textarea
+          ref={textareaRef}
+          className="source-textarea"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          data-gramm="false"
+          id="source-textarea"
+        />
+      </div>
     </div>
   );
 }
