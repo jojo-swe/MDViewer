@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 const MAX_RECENT = 10;
 const STORAGE_KEY = 'mdviewer-recent-files';
@@ -8,19 +8,14 @@ const STORAGE_KEY = 'mdviewer-recent-files';
  * Uses localStorage in browser, Tauri Store when available.
  */
 export function useRecentFiles() {
-  const [recentFiles, setRecentFiles] = useState([]);
-
-  // Load recent files on mount
-  useEffect(() => {
+  const [recentFiles, setRecentFiles] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setRecentFiles(JSON.parse(stored));
-      }
+      return stored ? JSON.parse(stored) : [];
     } catch {
-      // Ignore parse errors
+      return [];
     }
-  }, []);
+  });
 
   // Persist whenever the list changes
   const persist = useCallback((files) => {

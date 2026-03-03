@@ -25,7 +25,7 @@ Quick-win fixes and documentation alignment.
 - [x] Show regex error feedback in Find & Replace
 - [x] Align `package.json` version with `tauri.conf.json`
 - [x] Add `CHANGELOG.md`
-- [ ] Add pre-commit lint hook (ESLint)
+- [x] Add pre-commit lint hook (ESLint)
 
 ---
 

@@ -108,7 +108,7 @@ export default function FindReplace({ visible, onClose, containerRef, onReplace 
     } catch (err) {
       console.error('Search error:', err);
     }
-  }, [query, caseSensitive, useRegex, editorElement, buildPattern]);
+  }, [query, caseSensitive, useRegex, editorElement, buildPattern]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const timer = setTimeout(doSearch, 200);

@@ -48,9 +48,10 @@ console.log(greet("World"));
 *Happy writing!* ✨
 `;
 
-export default function MilkdownEditor({ theme, onMarkdownChange, externalContent, editorInstanceRef }) {
+export default function MilkdownEditor({ onMarkdownChange, externalContent, editorInstanceRef }) {
   const editorRef = useRef(null);
   const crepeRef = useRef(null);
+  const _initRef = useRef(null);
 
   // Expose setter for external content loading
   const setContent = useCallback((content) => {
@@ -58,9 +59,9 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
       // Destroy and recreate with new content
       crepeRef.current.destroy();
       crepeRef.current = null;
-      initEditor(content);
+      _initRef.current?.(content);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const initEditor = useCallback((content) => {
     if (!editorRef.current) return;
@@ -94,9 +95,14 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
     return crepe;
   }, [onMarkdownChange, editorInstanceRef, setContent]);
 
+  // Keep ref in sync so setContent always calls the latest initEditor
+  useEffect(() => {
+    _initRef.current = initEditor;
+  });
+
   // Initialize editor on mount
   useEffect(() => {
-    const crepe = initEditor(DEFAULT_CONTENT);
+    initEditor(DEFAULT_CONTENT);
     return () => {
       if (crepeRef.current) {
         crepeRef.current.destroy();

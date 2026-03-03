@@ -6,7 +6,6 @@
 
 let tauriDialog = null;
 let tauriFs = null;
-let isTauri = false;
 
 // Dynamically import Tauri modules (only available in the desktop app)
 async function ensureTauri() {
@@ -14,10 +13,8 @@ async function ensureTauri() {
   try {
     tauriDialog = await import('@tauri-apps/plugin-dialog');
     tauriFs = await import('@tauri-apps/plugin-fs');
-    isTauri = true;
     return true;
   } catch {
-    isTauri = false;
     return false;
   }
 }

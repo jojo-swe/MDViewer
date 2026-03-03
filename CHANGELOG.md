@@ -9,11 +9,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Pre-commit hook via husky v9 — `npm run lint` must pass before any commit is accepted
+
 ### Fixed
 - Welcome content table incorrectly labelled Split View as "Coming" — it is fully shipped
 - `package.json` version was `0.0.0`; aligned to `0.1.0` to match `tauri.conf.json`
 - MD047 lint rule was a no-op stub; now correctly flags files missing a trailing newline
 - Find & Replace silently swallowed invalid regex patterns; the error message is now shown below the search input
+- `MilkdownEditor`: removed unused `theme` prop from component signature and all call sites
+- `MilkdownEditor`: resolved `setContent`/`initEditor` circular forward-reference via a `useRef` indirection
+- `TitleBar`: empty `catch {}` blocks now contain a comment to satisfy the `no-empty` rule
+- `useTabs`: removed unused `useRef` import
+- `useRecentFiles`: replaced `useEffect` + `setRecentFiles` with a lazy `useState` initializer, eliminating one extra render on mount
+- `fileManager`: removed unused `isTauri` module-level variable
 
 ### Removed
 - Unused `markdownlint` npm dependency (the app uses its own custom linter engine)

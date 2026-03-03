@@ -354,7 +354,6 @@ function App() {
             <div className="split-pane split-pane--preview">
               <MilkdownEditor
                 key={editorContentKey}
-                theme={theme}
                 onMarkdownChange={handleMarkdownChange}
                 externalContent={editorContent}
                 editorInstanceRef={editorInstanceRef}

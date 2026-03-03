@@ -36,13 +36,13 @@ export default function TitleBar({ filename, isDirty }) {
   }, [appWindow]);
 
   const handleMinimize = () => {
-    try { appWindow.minimize(); } catch {}
+    try { appWindow.minimize(); } catch { /* not in Tauri */ }
   };
   const handleMaximize = () => {
-    try { appWindow.toggleMaximize(); } catch {}
+    try { appWindow.toggleMaximize(); } catch { /* not in Tauri */ }
   };
   const handleClose = () => {
-    try { appWindow.close(); } catch {}
+    try { appWindow.close(); } catch { /* not in Tauri */ }
   };
   const handleDragStart = (e) => {
     // Double-click toggles maximize
@@ -50,7 +50,7 @@ export default function TitleBar({ filename, isDirty }) {
       handleMaximize();
       return;
     }
-    try { appWindow.startDragging(); } catch {}
+    try { appWindow.startDragging(); } catch { /* not in Tauri */ }
   };
 
   const displayName = filename || 'Untitled';
