@@ -59,6 +59,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "MDViewer ${{ github.ref_name }}"
           releaseBody: "See the release notes for full changelog."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
