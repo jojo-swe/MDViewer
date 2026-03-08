@@ -16,6 +16,7 @@ import { useRecentFiles } from './hooks/useRecentFiles';
 import { useToast } from './hooks/useToast';
 import { openFile, saveFile, saveFileAs, getFileName, isDesktopApp } from './utils/fileManager';
 import { exportToPDF } from './utils/pdfExport';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import './App.css';
 
 function App() {
@@ -197,6 +198,7 @@ function App() {
 
   const handleConfirmSave = useCallback(async () => {
     const tabId = confirmState.tabId;
+    const isWindowClose = confirmState.isWindowClose;
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) {
       try {
@@ -213,12 +215,47 @@ function App() {
     }
     closeTab(tabId);
     setConfirmState({ visible: false, tabId: null });
-  }, [confirmState.tabId, tabs, closeTab, toast]);
 
-  const handleConfirmDiscard = useCallback(() => {
+    // If this was a window close, check if there are more dirty tabs
+    if (isWindowClose) {
+      const remainingDirty = tabs.filter(t => t.isDirty && t.id !== tabId);
+      if (remainingDirty.length === 0) {
+        // No more dirty tabs, close the window
+        await getCurrentWindow().destroy();
+      } else {
+        // Show dialog for the next dirty tab
+        const nextDirty = remainingDirty[0];
+        setConfirmState({ 
+          visible: true, 
+          tabId: nextDirty.id,
+          isWindowClose: true
+        });
+      }
+    }
+  }, [confirmState.tabId, confirmState.isWindowClose, tabs, closeTab, toast]);
+
+  const handleConfirmDiscard = useCallback(async () => {
+    const isWindowClose = confirmState.isWindowClose;
     closeTab(confirmState.tabId);
     setConfirmState({ visible: false, tabId: null });
-  }, [confirmState.tabId, closeTab]);
+
+    // If this was a window close, check if there are more dirty tabs
+    if (isWindowClose) {
+      const remainingDirty = tabs.filter(t => t.isDirty && t.id !== confirmState.tabId);
+      if (remainingDirty.length === 0) {
+        // No more dirty tabs, close the window
+        await getCurrentWindow().destroy();
+      } else {
+        // Show dialog for the next dirty tab
+        const nextDirty = remainingDirty[0];
+        setConfirmState({ 
+          visible: true, 
+          tabId: nextDirty.id,
+          isWindowClose: true
+        });
+      }
+    }
+  }, [confirmState.tabId, confirmState.isWindowClose, tabs, closeTab]);
 
   const handleConfirmCancel = useCallback(() => {
     setConfirmState({ visible: false, tabId: null });
@@ -317,6 +354,44 @@ function App() {
   }, [openInTab, toast]);
 
   const showTitleBar = isDesktopApp();
+
+  // --- Handle window close (X button) ---
+  useEffect(() => {
+    if (!showTitleBar) return; // Only in desktop app
+
+    const handleWindowClose = async (event) => {
+      event.preventDefault(); // Prevent immediate close
+
+      const dirtyTabs = tabs.filter(t => t.isDirty);
+      if (dirtyTabs.length === 0) {
+        // No unsaved changes, allow close
+        await getCurrentWindow().destroy();
+        return;
+      }
+
+      // Show save dialog for the first dirty tab
+      const firstDirty = dirtyTabs[0];
+      setConfirmState({ 
+        visible: true, 
+        tabId: firstDirty.id,
+        isWindowClose: true // Flag to indicate this is a window close
+      });
+    };
+
+    let unlisten;
+    const setupListener = async () => {
+      try {
+        unlisten = await getCurrentWindow().onCloseRequested(handleWindowClose);
+      } catch {
+        // Not in Tauri environment
+      }
+    };
+    setupListener();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [showTitleBar, tabs]);
 
   // --- Render the editor area based on mode ---
   const renderEditor = () => {
