@@ -16,7 +16,6 @@ import { useRecentFiles } from './hooks/useRecentFiles';
 import { useToast } from './hooks/useToast';
 import { openFile, saveFile, saveFileAs, getFileName, isDesktopApp } from './utils/fileManager';
 import { exportToPDF } from './utils/pdfExport';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import './App.css';
 
 function App() {
@@ -54,6 +53,8 @@ function App() {
   const [editorMode, setEditorMode] = useState(() => localStorage.getItem('mdviewer-editor-mode') || 'wysiwyg');
   const editorInstanceRef = useRef(null);
   const editorElementRef = useRef(null);
+  const unlistenRef = useRef(null);
+  const isMountedRef = useRef(true);
 
   const activeTabIdRef = useRef(activeId);
   const editorContent = activeTab?.content ?? '';
@@ -221,7 +222,12 @@ function App() {
       const remainingDirty = tabs.filter(t => t.isDirty && t.id !== tabId);
       if (remainingDirty.length === 0) {
         // No more dirty tabs, close the window
-        await getCurrentWindow().destroy();
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          await getCurrentWindow().destroy();
+        } catch {
+          // Not in Tauri environment, ignore
+        }
       } else {
         // Show dialog for the next dirty tab
         const nextDirty = remainingDirty[0];
@@ -244,7 +250,12 @@ function App() {
       const remainingDirty = tabs.filter(t => t.isDirty && t.id !== confirmState.tabId);
       if (remainingDirty.length === 0) {
         // No more dirty tabs, close the window
-        await getCurrentWindow().destroy();
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          await getCurrentWindow().destroy();
+        } catch {
+          // Not in Tauri environment, ignore
+        }
       } else {
         // Show dialog for the next dirty tab
         const nextDirty = remainingDirty[0];
@@ -365,7 +376,12 @@ function App() {
       const dirtyTabs = tabs.filter(t => t.isDirty);
       if (dirtyTabs.length === 0) {
         // No unsaved changes, allow close
-        await getCurrentWindow().destroy();
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          await getCurrentWindow().destroy();
+        } catch {
+          // Not in Tauri environment, ignore
+        }
         return;
       }
 
@@ -378,18 +394,23 @@ function App() {
       });
     };
 
-    let unlisten;
     const setupListener = async () => {
       try {
-        unlisten = await getCurrentWindow().onCloseRequested(handleWindowClose);
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        if (isMountedRef.current) {
+          unlistenRef.current = await getCurrentWindow().onCloseRequested(handleWindowClose);
+        }
       } catch {
-        // Not in Tauri environment
+        // Not in Tauri environment, ignore
       }
     };
     setupListener();
 
     return () => {
-      if (unlisten) unlisten();
+      isMountedRef.current = false;
+      if (unlistenRef.current) {
+        unlistenRef.current();
+      }
     };
   }, [showTitleBar, tabs]);
 
