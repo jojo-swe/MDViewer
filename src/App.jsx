@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+ import { useState, useCallback, useRef, useEffect } from 'react';
 import TitleBar from './components/TitleBar';
 import TabBar from './components/TabBar';
 import Sidebar from './components/Sidebar';
@@ -370,6 +370,9 @@ function App() {
   useEffect(() => {
     if (!showTitleBar) return; // Only in desktop app
 
+    isMountedRef.current = true;
+    unlistenRef.current = null;
+
     const handleWindowClose = async (event) => {
       event.preventDefault(); // Prevent immediate close
 
@@ -407,9 +410,11 @@ function App() {
     setupListener();
 
     return () => {
+      const unlisten = unlistenRef.current;
       isMountedRef.current = false;
-      if (unlistenRef.current) {
-        unlistenRef.current();
+      unlistenRef.current = null;
+      if (unlisten) {
+        unlisten();
       }
     };
   }, [showTitleBar, tabs]);

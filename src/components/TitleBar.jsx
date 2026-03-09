@@ -36,13 +36,22 @@ export default function TitleBar({ filename, isDirty }) {
   }, [appWindow]);
 
   const handleMinimize = () => {
-    try { appWindow.minimize(); } catch {}
+    try { appWindow.minimize(); } catch (error) { void error; }
   };
   const handleMaximize = () => {
-    try { appWindow.toggleMaximize(); } catch {}
+    try { appWindow.toggleMaximize(); } catch (error) { void error; }
   };
   const handleClose = () => {
-    try { appWindow.close(); } catch {}
+    appWindow.destroy().catch((error) => {
+      void error;
+    });
+  };
+  const handleControlsMouseDown = (e) => {
+    e.stopPropagation();
+  };
+  const handleControlClick = (handler) => (e) => {
+    e.stopPropagation();
+    handler();
   };
   const handleDragStart = (e) => {
     // Double-click toggles maximize
@@ -50,7 +59,7 @@ export default function TitleBar({ filename, isDirty }) {
       handleMaximize();
       return;
     }
-    try { appWindow.startDragging(); } catch {}
+    try { appWindow.startDragging(); } catch (error) { void error; }
   };
 
   const displayName = filename || 'Untitled';
@@ -73,10 +82,10 @@ export default function TitleBar({ filename, isDirty }) {
         <span className={`titlebar-filename ${isDirty ? 'dirty' : ''}`}>{title}</span>
       </div>
 
-      <div className="titlebar-controls">
+      <div className="titlebar-controls" onMouseDown={handleControlsMouseDown}>
         <button
           className="titlebar-btn titlebar-btn--minimize"
-          onClick={handleMinimize}
+          onClick={handleControlClick(handleMinimize)}
           aria-label="Minimize"
           id="minimize-btn"
         >
@@ -84,7 +93,7 @@ export default function TitleBar({ filename, isDirty }) {
         </button>
         <button
           className="titlebar-btn titlebar-btn--maximize"
-          onClick={handleMaximize}
+          onClick={handleControlClick(handleMaximize)}
           aria-label={isMaximized ? 'Restore' : 'Maximize'}
           id="maximize-btn"
         >
@@ -92,7 +101,7 @@ export default function TitleBar({ filename, isDirty }) {
         </button>
         <button
           className="titlebar-btn titlebar-btn--close"
-          onClick={handleClose}
+          onClick={handleControlClick(handleClose)}
           aria-label="Close"
           id="close-btn"
         >
