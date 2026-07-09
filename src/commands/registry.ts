@@ -17,9 +17,11 @@ import {
   ShieldCheck,
   ShieldAlert,
   RotateCcw,
+  Command as CommandIcon,
+  WrapText,
+  ListTree,
 } from 'lucide-react';
-import type { Command } from '../types/command';
-import type { CommandContext } from '../types/command';
+import type { Command, CommandContext } from '../types/command';
 
 export function createCommands(ctx: CommandContext): Command[] {
   return [
@@ -147,6 +149,29 @@ export function createCommands(ctx: CommandContext): Command[] {
       category: 'view',
       icon: Columns2,
       action: () => ctx.setEditorMode('split'),
+    },
+    {
+      id: 'view.toggleWordWrap',
+      title: 'Toggle Word Wrap',
+      category: 'view',
+      icon: WrapText,
+      action: () => ctx.toggleWordWrap(),
+    },
+    {
+      id: 'view.toggleOutline',
+      title: 'Toggle Outline',
+      shortcut: 'Ctrl+Shift+O',
+      category: 'view',
+      icon: ListTree,
+      action: () => ctx.toggleOutline(),
+    },
+    {
+      id: 'view.commandPalette',
+      title: 'Command Palette',
+      shortcut: 'Ctrl+Shift+P',
+      category: 'view',
+      icon: CommandIcon,
+      action: () => ctx.toggleCommandPalette(),
     },
 
     // --- Lint ---

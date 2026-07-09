@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import TitleBar from './components/TitleBar';
 import TabBar from './components/TabBar';
-import Sidebar from './components/Sidebar';
+import Sidebar, { type SidebarMode } from './components/Sidebar';
 import MilkdownEditor, { type EditorInstance } from './components/MilkdownEditor';
 import SourceEditor from './components/SourceEditor';
 import FindReplace from './components/FindReplace';
@@ -11,11 +11,17 @@ import ToastContainer from './components/ToastContainer';
 import StatusBar from './components/StatusBar';
 import SettingsPanel from './components/SettingsPanel';
 import CommandPalette from './components/CommandPalette';
+import ContextMenu from './components/ContextMenu';
 import { useSettings } from './hooks/useSettings';
 import { useLinter } from './hooks/useLinter';
 import { useTabs } from './hooks/useTabs';
 import { useToast } from './hooks/useToast';
 import { useCommands } from './hooks/useCommands';
+import { useSyncScroll } from './hooks/useSyncScroll';
+import { useAutoSave } from './hooks/useAutoSave';
+import { useOutline } from './hooks/useOutline';
+import { useShortcuts } from './hooks/useShortcuts';
+import { useContextMenu, type ContextMenuItem } from './hooks/useContextMenu';
 import { openFile, saveFile, saveFileAs, getFileName, isDesktopApp } from './utils/fileManager';
 import { exportToPDF } from './utils/pdfExport';
 import type { Tab } from './types/tab';
@@ -32,6 +38,9 @@ interface ConfirmState {
 
 function App() {
   const { settings, updateSettings, resetSettings, toggleTheme, toggleLint, setEditorMode, setStrictness } = useSettings();
+
+  const sourcePaneRef = useRef<HTMLDivElement>(null);
+  const previewPaneRef = useRef<HTMLDivElement>(null);
 
   const { results: lintResults, lint } = useLinter({
     strictness: settings.lint.strictness,
@@ -54,6 +63,15 @@ function App() {
   const toast = useToast();
 
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('explorer');
+  const [cursorPosition, setCursorPosition] = useState<{ line: number; col: number } | null>(null);
+  const [selectionLength, setSelectionLength] = useState(0);
+  const handleCursorChange = useCallback((line: number, col: number) => {
+    setCursorPosition({ line, col });
+  }, []);
+  const handleSelectionChange = useCallback((length: number) => {
+    setSelectionLength(length);
+  }, []);
   const [findVisible, setFindVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
@@ -195,6 +213,21 @@ function App() {
     toast.info('Opening print dialog for PDF export...');
   }, [activeTab?.path, toast]);
 
+  // --- Sync scroll (split view) ---
+  useSyncScroll(sourcePaneRef, previewPaneRef, {
+    enabled: settings.editorMode === 'split' && settings.syncScroll,
+  });
+
+  // --- Auto-save ---
+  const { status: autoSaveStatus } = useAutoSave(
+    activeTab,
+    { enabled: settings.autoSave.enabled, interval: settings.autoSave.interval },
+    { onSave: handleSave }
+  );
+
+  // --- Outline ---
+  const { headings, activeId: activeHeadingId, scrollToHeading } = useOutline(editorContent);
+
   const handleNewTab = useCallback(() => {
     createTab();
     setEditorContentKey((k) => k + 1);
@@ -332,64 +365,49 @@ function App() {
     toggleLint,
     setStrictness: (level: import('./types/lint').StrictnessLevel) => setStrictness(level),
     resetSettings,
-  }), [handleOpen, handleSave, handleSaveAs, handleNewTab, activeTab, handleCloseTab, handleExportPDF, cycleTab, handleSetEditorMode, toggleLint, setStrictness, resetSettings]);
+    toggleWordWrap: () => updateSettings({ wordWrap: !settings.wordWrap }),
+    toggleOutline: () => {
+      setSidebarMode((m) => m === 'outline' ? 'explorer' : 'outline');
+      setSidebarVisible(true);
+    },
+    toggleCommandPalette: () => setCommandPaletteVisible((v) => !v),
+  }), [handleOpen, handleSave, handleSaveAs, handleNewTab, activeTab, handleCloseTab, handleExportPDF, cycleTab, handleSetEditorMode, toggleLint, setStrictness, resetSettings, updateSettings, settings.wordWrap]);
 
   const commands = useCommands(commandContext);
+
+  // --- Context menu ---
+  const { menuState: contextMenuState, menuRef: contextMenuRef, showMenu: showContextMenu, hideMenu: hideContextMenu } = useContextMenu();
+
+  const handleTabContextMenu = useCallback((e: React.MouseEvent, tab: Tab) => {
+    e.preventDefault();
+    const items: ContextMenuItem[] = [
+      { id: 'close', label: 'Close', onClick: () => handleCloseTab(tab.id) },
+      { id: 'close-others', label: 'Close Others', onClick: () => { tabs.filter(t => t.id !== tab.id).forEach(t => handleCloseTab(t.id)); } },
+      { id: 'close-all', label: 'Close All', onClick: () => { tabs.forEach(t => handleCloseTab(t.id)); } },
+      { id: 'sep1', separator: true },
+      { id: 'copy-path', label: 'Copy Path', disabled: !tab.path, onClick: () => { if (tab.path) navigator.clipboard.writeText(tab.path); } },
+    ];
+    showContextMenu(e.clientX, e.clientY, items);
+  }, [handleCloseTab, tabs, showContextMenu]);
+
+  // --- Keyboard shortcuts ---
+  const { handleKeyDown: handleShortcut } = useShortcuts(commands, commandContext, settings.customShortcuts);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (handleShortcut(e)) return;
+      if (e.key === 'Escape') {
+        setFindVisible(false);
+        setCommandPaletteVisible(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleShortcut]);
 
   const handleExecuteCommand = useCallback((cmd: import('./types/command').Command) => {
     cmd.action(commandContext);
   }, [commandContext]);
-
-  // --- Keyboard shortcuts ---
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMod = e.ctrlKey || e.metaKey;
-
-      // Command palette: Ctrl+Shift+P
-      if (isMod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
-        e.preventDefault(); setCommandPaletteVisible((v) => !v); return;
-      }
-      // Settings: Ctrl+,
-      if (isMod && e.key === ',') {
-        e.preventDefault(); setSettingsVisible((v) => !v); return;
-      }
-      if (isMod && e.key === 'o') {
-        e.preventDefault(); handleOpen();
-      } else if (isMod && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
-        e.preventDefault(); handleExportPDF();
-      } else if (isMod && e.shiftKey && (e.key === 'S' || e.key === 's')) {
-        e.preventDefault(); handleSaveAs();
-      } else if (isMod && e.key === 's') {
-        e.preventDefault(); handleSave();
-      } else if (isMod && e.key === 'b') {
-        e.preventDefault(); setSidebarVisible((v) => !v);
-      } else if (isMod && e.key === 'f') {
-        e.preventDefault(); setFindVisible(true);
-      } else if (isMod && e.key === 'h') {
-        e.preventDefault(); setFindVisible(true);
-      } else if (isMod && e.key === 'w') {
-        e.preventDefault();
-        if (activeTab) handleCloseTab(activeTab.id);
-      } else if (e.key === 'Escape') {
-        setFindVisible(false);
-        setCommandPaletteVisible(false);
-      } else if (isMod && e.key === 'Tab') {
-        e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1);
-      } else if (isMod && e.key === 'n') {
-        e.preventDefault(); handleNewTab();
-      // Editor mode shortcuts: Ctrl+Alt+1/2/3
-      } else if (isMod && e.altKey && e.key === '1') {
-        e.preventDefault(); handleSetEditorMode('wysiwyg');
-      } else if (isMod && e.altKey && e.key === '2') {
-        e.preventDefault(); handleSetEditorMode('source');
-      } else if (isMod && e.altKey && e.key === '3') {
-        e.preventDefault(); handleSetEditorMode('split');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleOpen, handleSave, handleSaveAs, handleExportPDF, activeTab, handleCloseTab, cycleTab, handleNewTab, handleSetEditorMode]);
 
   // --- Drag & Drop ---
   useEffect(() => {
@@ -490,26 +508,37 @@ function App() {
           <SourceEditor
             value={editorContent}
             onChange={handleSourceChange}
+            fontSize={settings.fontSize}
+            wordWrap={settings.wordWrap}
+            onCursorChange={handleCursorChange}
+            onSelectionChange={handleSelectionChange}
           />
         );
 
       case 'split':
         return (
           <div className="split-view">
-            <div className="split-pane split-pane--source">
+            <div className="split-pane split-pane--source" ref={sourcePaneRef}>
               <SourceEditor
                 value={editorContent}
                 onChange={handleSourceChange}
+                fontSize={settings.fontSize}
+                wordWrap={settings.wordWrap}
+                onCursorChange={handleCursorChange}
+                onSelectionChange={handleSelectionChange}
               />
             </div>
             <div className="split-divider" />
-            <div className="split-pane split-pane--preview">
+            <div className="split-pane split-pane--preview" ref={previewPaneRef}>
               <MilkdownEditor
                 key={editorContentKey}
                 theme={settings.theme}
                 onMarkdownChange={handleMarkdownChange}
                 externalContent={editorContent}
                 editorInstanceRef={editorInstanceRef}
+                fontSize={settings.fontSize}
+                wordWrap={settings.wordWrap}
+                basePath={activeTab?.path ?? null}
               />
             </div>
           </div>
@@ -524,6 +553,9 @@ function App() {
             onMarkdownChange={handleMarkdownChange}
             externalContent={editorContent}
             editorInstanceRef={editorInstanceRef}
+            fontSize={settings.fontSize}
+            wordWrap={settings.wordWrap}
+            basePath={activeTab?.path ?? null}
           />
         );
     }
@@ -546,6 +578,7 @@ function App() {
         onSwitch={handleSwitchTab}
         onClose={handleCloseTab}
         onNew={handleNewTab}
+        onContextMenu={handleTabContextMenu}
       />
 
       <div className="app-body">
@@ -553,6 +586,11 @@ function App() {
           visible={sidebarVisible}
           onClose={() => setSidebarVisible(false)}
           onFileOpen={handleSidebarFileOpen}
+          mode={sidebarMode}
+          onModeChange={setSidebarMode}
+          headings={headings}
+          activeHeadingId={activeHeadingId}
+          onHeadingClick={scrollToHeading}
         />
 
         <div className="editor-pane" ref={editorElementRef}>
@@ -578,6 +616,10 @@ function App() {
         editorMode={settings.editorMode}
         onSetEditorMode={handleSetEditorMode}
         onOpenSettings={() => setSettingsVisible(true)}
+        autoSaveStatus={autoSaveStatus}
+        cursorPosition={settings.editorMode === 'source' || settings.editorMode === 'split' ? cursorPosition : null}
+        selectionLength={settings.editorMode === 'source' || settings.editorMode === 'split' ? selectionLength : undefined}
+        filePath={activeTab?.path ?? null}
       />
 
       <SettingsPanel
@@ -605,6 +647,18 @@ function App() {
       />
 
       <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
+
+      <ContextMenu
+        visible={contextMenuState.visible}
+        x={contextMenuState.x}
+        y={contextMenuState.y}
+        items={contextMenuState.items}
+        menuRef={contextMenuRef}
+        onItemClick={(item) => {
+          hideContextMenu();
+          item.onClick?.();
+        }}
+      />
     </div>
   );
 }

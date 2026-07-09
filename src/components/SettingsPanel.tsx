@@ -17,10 +17,11 @@ import {
   WrapText,
   ScrollText,
 } from 'lucide-react';
-import type { AppSettings } from '../types/settings';
-import type { Theme, EditorMode } from '../types/settings';
+import type { AppSettings, Theme, EditorMode } from '../types/settings';
 import type { StrictnessLevel } from '../types/lint';
 import { STRICTNESS_OPTIONS } from '../utils/linter';
+import { themeList } from '../themes';
+import { DEFAULT_SHORTCUTS, detectConflicts, shortcutToString, parseShortcutFromEvent } from '../hooks/useShortcuts';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -41,27 +42,30 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: 'about', label: 'About' },
 ];
 
-const SHORTCUTS: Array<{ action: string; keys: string }> = [
-  { action: 'New Tab', keys: 'Ctrl+N' },
-  { action: 'Open File', keys: 'Ctrl+O' },
-  { action: 'Save', keys: 'Ctrl+S' },
-  { action: 'Save As', keys: 'Ctrl+Shift+S' },
-  { action: 'Export PDF', keys: 'Ctrl+Shift+E' },
-  { action: 'Close Tab', keys: 'Ctrl+W' },
-  { action: 'Toggle Sidebar', keys: 'Ctrl+B' },
-  { action: 'Find', keys: 'Ctrl+F' },
-  { action: 'Find & Replace', keys: 'Ctrl+H' },
-  { action: 'Cycle Tabs', keys: 'Ctrl+Tab' },
-  { action: 'WYSIWYG Mode', keys: 'Ctrl+Alt+1' },
-  { action: 'Source Mode', keys: 'Ctrl+Alt+2' },
-  { action: 'Split Mode', keys: 'Ctrl+Alt+3' },
-  { action: 'Command Palette', keys: 'Ctrl+Shift+P' },
-  { action: 'Settings', keys: 'Ctrl+,' },
-];
+const SHORTCUT_LABELS: Record<string, string> = {
+  'file.new': 'New Tab',
+  'file.open': 'Open File',
+  'file.save': 'Save',
+  'file.saveAs': 'Save As',
+  'file.exportPDF': 'Export PDF',
+  'file.closeTab': 'Close Tab',
+  'edit.find': 'Find',
+  'edit.replace': 'Find & Replace',
+  'view.toggleSidebar': 'Toggle Sidebar',
+  'view.toggleOutline': 'Toggle Outline',
+  'view.toggleSettings': 'Settings',
+  'view.commandPalette': 'Command Palette',
+  'view.cycleTabs': 'Next Tab',
+  'view.cycleTabsPrev': 'Previous Tab',
+  'view.wysiwyg': 'WYSIWYG Mode',
+  'view.source': 'Source Mode',
+  'view.split': 'Split Mode',
+};
 
 export default function SettingsPanel({ visible, settings, onClose, onUpdate, onReset }: SettingsPanelProps) {
   const [activeSection, setActiveSection] = useState<SectionId>('general');
   const panelRef = useRef<HTMLDivElement>(null);
+  const [capturingShortcut, setCapturingShortcut] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -74,10 +78,11 @@ export default function SettingsPanel({ visible, settings, onClose, onUpdate, on
 
   if (!visible) return null;
 
-  const themeOptions: Array<{ value: Theme; label: string; icon: React.ReactNode }> = [
-    { value: 'light', label: 'Light', icon: <Sun size={15} /> },
-    { value: 'dark', label: 'Dark', icon: <Moon size={15} /> },
-  ];
+  const themeOptions: Array<{ value: Theme; label: string; icon: React.ReactNode }> = themeList.map((t) => ({
+    value: t.name as Theme,
+    label: t.label,
+    icon: t.isDark ? <Moon size={15} /> : <Sun size={15} />,
+  }));
 
   const modeOptions: Array<{ value: EditorMode; label: string; icon: React.ReactNode }> = [
     { value: 'wysiwyg', label: 'WYSIWYG', icon: <Eye size={15} /> },
@@ -144,7 +149,7 @@ export default function SettingsPanel({ visible, settings, onClose, onUpdate, on
                     <Sun size={16} className="setting-icon" />
                     <div>
                       <div className="setting-name">Theme</div>
-                      <div className="setting-desc">Choose light or dark appearance</div>
+                      <div className="setting-desc">Choose color scheme</div>
                     </div>
                   </div>
                   <div className="setting-control">
@@ -358,16 +363,84 @@ export default function SettingsPanel({ visible, settings, onClose, onUpdate, on
               <div className="settings-section">
                 <div className="settings-section-info">
                   <Keyboard size={14} />
-                  <span>Keyboard shortcuts are read-only in this version. Custom shortcuts coming in a future update.</span>
+                  <span>Click a shortcut to rebind it. Press Escape to cancel.</span>
                 </div>
                 <div className="settings-shortcuts-list">
-                  {SHORTCUTS.map((s) => (
-                    <div key={s.action} className="shortcut-row">
-                      <span className="shortcut-action">{s.action}</span>
-                      <kbd className="shortcut-keys">{s.keys}</kbd>
-                    </div>
-                  ))}
+                  {Object.entries(DEFAULT_SHORTCUTS).map(([actionId, defaultKeys]) => {
+                    const currentKeys = settings.customShortcuts[actionId] ?? defaultKeys;
+                    const isCustom = settings.customShortcuts[actionId] !== undefined;
+                    const isCapturing = capturingShortcut === actionId;
+                    const conflicts = detectConflicts({
+                      ...DEFAULT_SHORTCUTS,
+                      ...settings.customShortcuts,
+                    });
+                    const conflictActions = conflicts.get(actionId);
+                    return (
+                      <div key={actionId} className="shortcut-row">
+                        <div className="shortcut-info">
+                          <span className="shortcut-action">{SHORTCUT_LABELS[actionId] ?? actionId}</span>
+                          {isCustom && (
+                            <button
+                              className="shortcut-reset-btn"
+                              onClick={() => {
+                                const next = { ...settings.customShortcuts };
+                                delete next[actionId];
+                                onUpdate({ customShortcuts: next });
+                              }}
+                              title="Reset to default"
+                            >
+                              <RotateCcw size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="shortcut-right">
+                          {conflictActions && (
+                            <span className="shortcut-conflict" title={`Conflicts with: ${conflictActions.join(', ')}`}>
+                              !
+                            </span>
+                          )}
+                          <button
+                            className={`shortcut-keys ${isCapturing ? 'capturing' : ''} ${conflictActions ? 'has-conflict' : ''}`}
+                            onClick={() => setCapturingShortcut(actionId)}
+                            onKeyDown={(e) => {
+                              if (!isCapturing) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.key === 'Escape') {
+                                setCapturingShortcut(null);
+                                return;
+                              }
+                              if (e.key === 'Backspace' || e.key === 'Delete') {
+                                const next = { ...settings.customShortcuts };
+                                delete next[actionId];
+                                onUpdate({ customShortcuts: next });
+                                setCapturingShortcut(null);
+                                return;
+                              }
+                              const parsed = parseShortcutFromEvent(e);
+                              if (parsed.key && parsed.key !== 'shift' && parsed.key !== 'control' && parsed.key !== 'alt' && parsed.key !== 'meta') {
+                                const combo = shortcutToString(parsed);
+                                onUpdate({
+                                  customShortcuts: { ...settings.customShortcuts, [actionId]: combo },
+                                });
+                                setCapturingShortcut(null);
+                              }
+                            }}
+                          >
+                            {isCapturing ? 'Press keys…' : currentKeys}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+                <button
+                  className="settings-reset-all-shortcuts"
+                  onClick={() => onUpdate({ customShortcuts: {} })}
+                >
+                  <RotateCcw size={14} />
+                  Reset All to Defaults
+                </button>
               </div>
             )}
 

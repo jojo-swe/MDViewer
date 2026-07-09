@@ -63,6 +63,13 @@
   background: var(--accent-primary-subtle);
 }
 
+/* --- Word Wrap --- */
+.source-editor--wrap .source-textarea--wrap {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+}
+
 /* Scrollbar for source editor */
 .source-textarea::-webkit-scrollbar {
   width: 6px;

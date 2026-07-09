@@ -13,10 +13,12 @@ import {
   ShieldCheck,
   ShieldAlert,
   Settings,
+  Loader2,
 } from 'lucide-react';
 import { STRICTNESS_OPTIONS } from '../utils/linter';
 import type { LintResult, StrictnessLevel } from '../types/lint';
 import type { Theme, EditorMode } from '../types/settings';
+import type { AutoSaveStatus } from '../hooks/useAutoSave';
 import EditorModeToggle from './EditorModeToggle';
 import './StatusBar.css';
 
@@ -32,6 +34,10 @@ interface StatusBarProps {
   editorMode: EditorMode;
   onSetEditorMode: (mode: EditorMode) => void;
   onOpenSettings: () => void;
+  autoSaveStatus?: AutoSaveStatus;
+  cursorPosition?: { line: number; col: number } | null;
+  selectionLength?: number;
+  filePath?: string | null;
 }
 
 export default function StatusBar({
@@ -46,10 +52,16 @@ export default function StatusBar({
   editorMode,
   onSetEditorMode,
   onOpenSettings,
+  autoSaveStatus,
+  cursorPosition,
+  selectionLength,
+  filePath,
 }: StatusBarProps) {
   const [expanded, setExpanded] = useState(false);
   const [showStrictnessMenu, setShowStrictnessMenu] = useState(false);
+  const [showStatsPopover, setShowStatsPopover] = useState(false);
   const strictnessRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
 
   // Word count
   const wordCount = markdown
@@ -61,12 +73,25 @@ export default function StatusBar({
     : 0;
 
   const charCount = markdown ? markdown.length : 0;
+  const lineCount = markdown ? markdown.split(/\n/).length : 0;
+  const paragraphCount = markdown ? markdown.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length : 0;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
-  // Close menu on outside click
+  // Truncate file path for display
+  const truncatedPath = filePath
+    ? filePath.length > 40
+      ? '...' + filePath.slice(-37)
+      : filePath
+    : null;
+
+  // Close menus on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (strictnessRef.current && !strictnessRef.current.contains(e.target as Node)) {
         setShowStrictnessMenu(false);
+      }
+      if (statsRef.current && !statsRef.current.contains(e.target as Node)) {
+        setShowStatsPopover(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -205,14 +230,84 @@ export default function StatusBar({
               Clean
             </span>
           )}
+          {autoSaveStatus === 'saving' && (
+            <span className="status-autosave status-autosave--saving">
+              <Loader2 size={12} className="spin" />
+              Saving…
+            </span>
+          )}
+          {autoSaveStatus === 'saved' && (
+            <span className="status-autosave status-autosave--saved">
+              <CheckCircle size={12} />
+              Saved
+            </span>
+          )}
+          {autoSaveStatus === 'error' && (
+            <span className="status-autosave status-autosave--error">
+              <AlertCircle size={12} />
+              Save failed
+            </span>
+          )}
         </div>
 
         <div className="status-bar-right">
           <EditorModeToggle mode={editorMode} onModeChange={onSetEditorMode} />
           <span className="status-divider" />
-          <span className="status-stat">{wordCount} words</span>
+          {truncatedPath && (
+            <>
+              <span className="status-stat status-filepath" title={filePath ?? undefined}>
+                {truncatedPath}
+              </span>
+              <span className="status-divider" />
+            </>
+          )}
+          <div className="status-stats-wrapper" ref={statsRef}>
+            <button
+              className="status-btn status-stats-btn"
+              onClick={() => setShowStatsPopover((v) => !v)}
+              title="Document statistics"
+            >
+              <span className="status-stat">{wordCount} words</span>
+            </button>
+            {showStatsPopover && (
+              <div className="stats-popover" id="stats-popover">
+                <div className="stats-popover-row">
+                  <span>Words</span>
+                  <span className="stats-popover-value">{wordCount.toLocaleString()}</span>
+                </div>
+                <div className="stats-popover-row">
+                  <span>Characters</span>
+                  <span className="stats-popover-value">{charCount.toLocaleString()}</span>
+                </div>
+                <div className="stats-popover-row">
+                  <span>Lines</span>
+                  <span className="stats-popover-value">{lineCount.toLocaleString()}</span>
+                </div>
+                <div className="stats-popover-row">
+                  <span>Paragraphs</span>
+                  <span className="stats-popover-value">{paragraphCount.toLocaleString()}</span>
+                </div>
+                <div className="stats-popover-row">
+                  <span>Reading time</span>
+                  <span className="stats-popover-value">~{readingTime} min</span>
+                </div>
+              </div>
+            )}
+          </div>
           <span className="status-divider" />
           <span className="status-stat">{charCount} chars</span>
+          {selectionLength != null && selectionLength > 0 && (
+            <>
+              <span className="status-divider" />
+              <span className="status-stat status-selection">{selectionLength} selected</span>
+            </>
+          )}
+          {cursorPosition && (
+            <>
+              <span className="status-divider" />
+              <span className="status-stat">Ln {cursorPosition.line}, Col {cursorPosition.col}</span>
+            </>
+          )}
           <span className="status-divider" />
 
           <button

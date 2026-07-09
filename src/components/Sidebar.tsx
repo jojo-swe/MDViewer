@@ -8,8 +8,13 @@ import {
   RefreshCw,
   FolderPlus,
   X,
+  ListTree,
+  FolderTree,
 } from 'lucide-react';
 import './Sidebar.css';
+import './Outline.css';
+import Outline from './Outline';
+import type { Heading } from '../hooks/useOutline';
 
 interface TreeItemData {
   name: string;
@@ -144,13 +149,20 @@ function TreeItem({ item, onFileClick, level = 0 }: TreeItemProps) {
   );
 }
 
+export type SidebarMode = 'explorer' | 'outline';
+
 interface SidebarProps {
   visible: boolean;
   onClose: () => void;
   onFileOpen: (path: string, content: string) => void;
+  mode: SidebarMode;
+  onModeChange: (mode: SidebarMode) => void;
+  headings: Heading[];
+  activeHeadingId: string | null;
+  onHeadingClick: (heading: Heading) => void;
 }
 
-export default function Sidebar({ visible, onClose, onFileOpen }: SidebarProps) {
+export default function Sidebar({ visible, onClose, onFileOpen, mode, onModeChange, headings, activeHeadingId, onHeadingClick }: SidebarProps) {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [rootName, setRootName] = useState('');
   const [tree, setTree] = useState<TreeItemData[]>([]);
@@ -193,54 +205,88 @@ export default function Sidebar({ visible, onClose, onFileOpen }: SidebarProps) 
 
   return (
     <div className="sidebar" id="sidebar">
-      <div className="sidebar-header">
-        <span className="sidebar-title">Explorer</span>
-        <div className="sidebar-actions">
-          <button className="sidebar-action-btn" onClick={openFolder} title="Open Folder">
-            <FolderPlus size={14} />
-          </button>
-          <button className="sidebar-action-btn" onClick={onClose} title="Close Sidebar">
-            <X size={14} />
-          </button>
-        </div>
+      <div className="sidebar-mode-tabs">
+        <button
+          className={`sidebar-mode-tab ${mode === 'explorer' ? 'sidebar-mode-tab--active' : ''}`}
+          onClick={() => onModeChange('explorer')}
+        >
+          <FolderTree size={12} />
+          Explorer
+        </button>
+        <button
+          className={`sidebar-mode-tab ${mode === 'outline' ? 'sidebar-mode-tab--active' : ''}`}
+          onClick={() => onModeChange('outline')}
+        >
+          <ListTree size={12} />
+          Outline
+        </button>
+        <button className="sidebar-mode-tab" onClick={onClose} title="Close Sidebar" style={{ flex: '0 0 auto' }}>
+          <X size={12} />
+        </button>
       </div>
 
-      <div className="sidebar-body">
-        {!rootPath ? (
-          <div className="sidebar-empty">
-            <FolderOpen size={28} />
-            <span>No folder opened</span>
-            <button className="sidebar-open-btn" onClick={openFolder}>
-              Open Folder
-            </button>
+      {mode === 'explorer' && (
+        <>
+          <div className="sidebar-header">
+            <span className="sidebar-title">Explorer</span>
+            <div className="sidebar-actions">
+              <button className="sidebar-action-btn" onClick={openFolder} title="Open Folder">
+                <FolderPlus size={14} />
+              </button>
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="sidebar-root-label">
-              <FolderOpen size={13} />
-              <span>{rootName}</span>
-            </div>
-            <div className="sidebar-tree">
-              {loading ? (
-                <div className="sidebar-loading">
-                  <RefreshCw size={14} className="tree-item-spinner" />
-                  Loading...
+
+          <div className="sidebar-body">
+            {!rootPath ? (
+              <div className="sidebar-empty">
+                <FolderOpen size={28} />
+                <span>No folder opened</span>
+                <button className="sidebar-open-btn" onClick={openFolder}>
+                  Open Folder
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="sidebar-root-label">
+                  <FolderOpen size={13} />
+                  <span>{rootName}</span>
                 </div>
-              ) : tree.length === 0 ? (
-                <div className="sidebar-empty-tree">No markdown files found</div>
-              ) : (
-                tree.map((item) => (
-                  <TreeItem
-                    key={item.path}
-                    item={item}
-                    onFileClick={handleFileClick}
-                  />
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </div>
+                <div className="sidebar-tree">
+                  {loading ? (
+                    <div className="sidebar-loading">
+                      <RefreshCw size={14} className="tree-item-spinner" />
+                      Loading...
+                    </div>
+                  ) : tree.length === 0 ? (
+                    <div className="sidebar-empty-tree">No markdown files found</div>
+                  ) : (
+                    tree.map((item) => (
+                      <TreeItem
+                        key={item.path}
+                        item={item}
+                        onFileClick={handleFileClick}
+                      />
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {mode === 'outline' && (
+        <div className="sidebar-body">
+          <div className="sidebar-header">
+            <span className="sidebar-title">Outline</span>
+          </div>
+          <Outline
+            headings={headings}
+            activeId={activeHeadingId}
+            onHeadingClick={onHeadingClick}
+          />
+        </div>
+      )}
     </div>
   );
 }

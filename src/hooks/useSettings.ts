@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { AppSettings, Theme, EditorMode, RecentFile } from '../types/settings';
 import type { StrictnessLevel } from '../types/lint';
+import { applyTheme, builtinThemes } from '../themes';
 
 const STORAGE_KEY = 'mdviewer-settings';
 
@@ -193,7 +194,7 @@ export function useSettings() {
 
   // Apply theme to DOM
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', settings.theme);
+    applyTheme(settings.theme);
   }, [settings.theme]);
 
   const updateSetting = useCallback(<K extends keyof AppSettings>(
@@ -237,7 +238,10 @@ export function useSettings() {
   const setStrictness = useCallback((level: StrictnessLevel) => updateLintSetting('strictness', level), [updateLintSetting]);
   const setLintEnabled = useCallback((enabled: boolean) => updateLintSetting('enabled', enabled), [updateLintSetting]);
   const toggleTheme = useCallback(() => {
-    setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' }));
+    setSettings((prev) => {
+      const currentIsDark = builtinThemes[prev.theme]?.isDark ?? true;
+      return { ...prev, theme: currentIsDark ? 'light' : 'dark' };
+    });
   }, []);
   const toggleLint = useCallback(() => {
     setSettings((prev) => ({ ...prev, lint: { ...prev.lint, enabled: !prev.lint.enabled } }));

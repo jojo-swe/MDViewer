@@ -19,6 +19,13 @@
   padding-bottom: calc(var(--status-bar-height) + 8px);
 }
 
+/* --- Word Wrap (Milkdown) --- */
+.editor-container--wrap .milkdown-wrapper .ProseMirror pre {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+}
+
 /* --- App Body (Sidebar + Editor) --- */
 .app-body {
   flex: 1;
@@ -322,4 +329,57 @@
   .milkdown-wrapper .ProseMirror h2 {
     font-size: 1.35em;
   }
+}
+
+/* ============================================
+   Shiki Syntax Highlighting
+   ============================================ */
+
+.milkdown-wrapper .shiki {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md, 8px);
+  overflow-x: auto;
+  font-family: var(--font-mono, 'Fira Code', 'Cascadia Code', monospace);
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid var(--border-light, rgba(128, 128, 128, 0.2));
+}
+
+.milkdown-wrapper .shiki code {
+  font-family: inherit;
+  background: none;
+  padding: 0;
+}
+
+.milkdown-wrapper .shiki span {
+  font-family: inherit;
+}
+
+/* Word wrap for Shiki code blocks */
+.editor-container--wrap .milkdown-wrapper .shiki {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   Mermaid Diagrams
+   ============================================ */
+
+.milkdown-wrapper .mermaid-svg {
+  margin: 12px 0;
+  padding: 16px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-card, #f6f8fa);
+  border: 1px solid var(--border-light, rgba(128, 128, 128, 0.2));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+}
+
+.milkdown-wrapper .mermaid-svg svg {
+  max-width: 100%;
+  height: auto;
 }

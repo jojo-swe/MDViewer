@@ -110,7 +110,7 @@ export default function FindReplace({ visible, onClose, containerRef, onReplace 
     } catch (err) {
       console.error('Search error:', err);
     }
-  }, [query, caseSensitive, useRegex, editorElement, buildPattern]);
+  }, [query, editorElement, buildPattern]);
 
   useEffect(() => {
     const timer = setTimeout(doSearch, 200);

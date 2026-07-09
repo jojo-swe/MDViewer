@@ -17,6 +17,9 @@ export interface CommandContext {
   toggleLint: () => void;
   setStrictness: (level: import('./lint').StrictnessLevel) => void;
   resetSettings: () => void;
+  toggleWordWrap: () => void;
+  toggleOutline: () => void;
+  toggleCommandPalette: () => void;
 }
 
 export interface Command {

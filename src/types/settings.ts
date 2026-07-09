@@ -1,6 +1,6 @@
 import type { StrictnessLevel } from './lint';
 
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'github-dark' | 'solarized-dark' | 'solarized-light' | (string & {});
 
 export type EditorMode = 'wysiwyg' | 'source' | 'split';
 

@@ -114,42 +114,8 @@ body {
 }
 
 /* --- Theme Variables (Dark) --- */
-[data-theme="dark"] {
-  --bg-app: #0f0f17;
-  --bg-sidebar: #16161f;
-  --bg-editor: #1a1a27;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.08);
-  --bg-tooltip: #2a2a3d;
-  --bg-modal-overlay: rgba(0, 0, 0, 0.6);
-  --bg-card: #1e1e2e;
-  --bg-input: #252535;
-  --bg-status: rgba(22, 22, 31, 0.9);
-  --bg-lint-panel: #1e1e2e;
-
-  --text-primary: #e4e4f0;
-  --text-secondary: #9ca3b0;
-  --text-tertiary: #6b7280;
-  --text-inverse: #0f0f17;
-  --text-link: #818cf8;
-
-  --accent-primary: #818cf8;
-  --accent-primary-hover: #6366f1;
-  --accent-primary-subtle: rgba(129, 140, 248, 0.1);
-
-  --border-light: rgba(255, 255, 255, 0.06);
-  --border-medium: rgba(255, 255, 255, 0.1);
-
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-float: 0 12px 48px rgba(0, 0, 0, 0.5);
-
-  --lint-error-bg: rgba(239, 68, 68, 0.12);
-  --lint-warning-bg: rgba(245, 158, 11, 0.12);
-  --lint-info-bg: rgba(59, 130, 246, 0.12);
-}
+/* Dark theme colors are now applied dynamically via src/themes/index.ts */
+/* The :root block above serves as the light theme fallback */
 
 /* --- Global Styles --- */
 #root {

@@ -19,6 +19,9 @@ function makeMockContext(): CommandContext {
     toggleLint: vi.fn(),
     setStrictness: vi.fn(),
     resetSettings: vi.fn(),
+    toggleWordWrap: vi.fn(),
+    toggleOutline: vi.fn(),
+    toggleCommandPalette: vi.fn(),
   };
 }
 
@@ -45,6 +48,9 @@ describe('useCommands', () => {
     const viewCmds = result.current.filter((c) => c.category === 'view');
     expect(viewCmds.some((c) => c.id === 'view.toggleSidebar')).toBe(true);
     expect(viewCmds.some((c) => c.id === 'view.wysiwyg')).toBe(true);
+    expect(viewCmds.some((c) => c.id === 'view.toggleWordWrap')).toBe(true);
+    expect(viewCmds.some((c) => c.id === 'view.toggleOutline')).toBe(true);
+    expect(viewCmds.some((c) => c.id === 'view.commandPalette')).toBe(true);
   });
 
   it('includes lint commands', () => {

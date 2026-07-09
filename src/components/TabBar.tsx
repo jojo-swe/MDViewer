@@ -9,9 +9,10 @@ interface TabBarProps {
   onSwitch: (id: number) => void;
   onClose: (id: number) => void;
   onNew: () => void;
+  onContextMenu?: (e: React.MouseEvent, tab: Tab) => void;
 }
 
-export default function TabBar({ tabs, activeId, onSwitch, onClose, onNew }: TabBarProps) {
+export default function TabBar({ tabs, activeId, onSwitch, onClose, onNew, onContextMenu }: TabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -22,6 +23,7 @@ export default function TabBar({ tabs, activeId, onSwitch, onClose, onNew }: Tab
             key={tab.id}
             className={`tab ${tab.id === activeId ? 'tab--active' : ''} ${tab.isDirty ? 'tab--dirty' : ''}`}
             onClick={() => onSwitch(tab.id)}
+            onContextMenu={onContextMenu ? (e) => onContextMenu(e, tab) : undefined}
             title={tab.path || tab.filename}
             id={`tab-${tab.id}`}
           >
