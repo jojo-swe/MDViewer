@@ -65,7 +65,7 @@ State is passed down as props; there is no context or global store.
 Three modes are rendered by `App.jsx`'s `renderEditor()` function:
 
 - **`wysiwyg`** — `<MilkdownEditor>` only (Crepe/ProseMirror)
-- **`source`** — `<SourceEditor>` only (plain `<textarea>` with line numbers)
+- **`source`** — `<SourceEditor>` only (`<textarea>` with line numbers; transparent text over a highlight.js `<pre>` overlay for syntax colouring)
 - **`split`** — both side-by-side inside `.split-view`
 
 `editorMode` is persisted to `localStorage` under `mdviewer-editor-mode`.
@@ -162,7 +162,7 @@ The Rust side (`src-tauri/src/lib.rs`) is intentionally minimal — it only regi
 
 ## Linter Engine (`src/utils/linter.js`)
 
-The linter is a custom rule-based engine (not the `markdownlint` npm package, though it is listed as a dependency). Rules are defined in the `RULES` object and each has:
+The linter is a custom rule-based engine (no `markdownlint` dependency). Rules are defined in the `RULES` object and each has:
 
 - `level`: `"relaxed"` | `"standard"` | `"strict"` — determines which strictness presets include the rule
 - `severity`: `"error"` | `"warning"` | `"info"`
@@ -184,6 +184,7 @@ When adding a new rule, follow the existing pattern: add it to `RULES`, assign a
 - The `key={editorContentKey}` on `<MilkdownEditor>` in `App.jsx` is the primary mechanism for forcing remounts; bump `editorContentKey` whenever you need a fresh editor instance.
 - `editorInstanceRef.current` exposes `{ getMarkdown(), setContent() }` so the parent can read the current markdown before save operations.
 - The `// eslint-disable-line react-hooks/exhaustive-deps` suppressions in this file are intentional — the `useEffect` for initialization must only run once on mount.
+- `setContent` calls `initEditor` through `_initRef` (synced in a `useEffect`) to avoid a circular forward reference between the two callbacks.
 
 ---
 
@@ -204,9 +205,18 @@ Releases are triggered by pushing a `v*` tag (e.g., `v1.0.0`). The GitHub Action
 
 - **Ubuntu 22.04** — `.AppImage`, `.deb`
 - **macOS** — universal binary `.dmg` (`x86_64` + `aarch64`)
-- **Windows** — `.msi`
+- **Windows** — `.msi` and NSIS `.exe` (`bundle.targets: "all"` in `tauri.conf.json`)
 
-The workflow creates a **draft** release. Publish it manually after verifying the artifacts.
+The workflow publishes the release immediately (`releaseDraft: false`). Tag from `main` after merging.
+
+A husky pre-commit hook runs `npm run lint`; lint must be clean (0 errors, 0 warnings) to commit.
+
+---
+
+## Planning Docs
+
+- `ROADMAP.md` — milestone checklist; tick items off as they ship.
+- `CHANGELOG.md` — Keep-a-Changelog format; add every user-facing change under `[Unreleased]`.
 
 ---
 
