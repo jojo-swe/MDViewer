@@ -103,6 +103,27 @@
   color: transparent;
 }
 
+/* --- Word Wrap --- */
+.source-editor--wrap .source-textarea--wrap {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+}
+.source-editor--wrap .source-highlight--wrap {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* Reserve the same scrollbar gutter on both layers so wrapped lines break identically */
+.source-textarea,
+.source-highlight {
+  scrollbar-gutter: stable;
+}
+.source-highlight::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
 /* Scrollbar for source editor */
 .source-textarea::-webkit-scrollbar {
   width: 6px;

@@ -1,237 +1,146 @@
 # CLAUDE.md — MDViewer
 
-This file provides guidance for AI assistants (Claude and others) working on the MDViewer codebase.
+Guidance for AI assistants working on the MDViewer codebase.
 
 ## Project Overview
 
-MDViewer is a cross-platform WYSIWYG Markdown editor built with **React 19 + Vite** on the frontend and **Tauri v2 (Rust)** on the backend. It runs as both a native desktop app (via Tauri) and a browser-only web app (with graceful fallbacks).
+MDViewer is a cross-platform WYSIWYG Markdown editor built with **React 19 + TypeScript + Vite** on the frontend and **Tauri v2 (Rust)** on the backend. It runs as a native desktop app (via Tauri) and as a browser-only web app (with graceful fallbacks).
 
 **Key characteristics:**
-- No build-time CSS preprocessing — all styling is plain CSS with custom properties
-- No state management library — state is managed entirely through custom React hooks
-- No TypeScript — the project uses plain JavaScript with JSDoc comments
-- The Rust backend has no custom commands; all Tauri interaction is through plugins
+- TypeScript in `strict` mode (`noUnusedLocals`, `noUnusedParameters`); shared types live in `src/types/`
+- Plain CSS with custom properties — no preprocessors, no CSS-in-JS
+- No state-management library — state lives in custom hooks composed in `App.tsx`
+- The Rust backend has no custom commands; all native access is through Tauri plugins
 
 ---
 
 ## Development Commands
 
 ```bash
-# Install dependencies
-npm install
-
-# Run frontend only (browser, hot-reload)
-npm run dev
-
-# Run as Tauri desktop app (opens native window)
-npm run tauri dev
-
-# Lint (ESLint)
-npm run lint
-
-# Build frontend only
-npm run build
-
-# Build native desktop installers (all platforms)
-npm run tauri build
+npm install            # also installs the husky pre-commit hook via "prepare"
+npm run dev            # frontend only (browser, hot reload) on port 5173
+npm run tauri:dev      # desktop app
+npm run lint           # ESLint (typescript-eslint + react-hooks)
+npm run typecheck      # tsc --noEmit
+npm test               # Vitest in watch mode
+npm run test:run       # Vitest once
+npm run test:coverage  # what CI runs
+npm run build          # production frontend build
+npm run tauri:build    # native installers for the host platform
 ```
 
-The dev server is fixed to port **5173** (`vite.config.js` uses `strictPort: true`) because Tauri hard-codes this URL.
+The dev server port is fixed at **5173** (`strictPort: true`) because Tauri hard-codes it.
+
+**Before committing**, run `lint`, `typecheck` and `test:run`. The pre-commit hook enforces `lint` only; CI (`.github/workflows/ci.yml`) runs all four plus `build` on every PR to `main`.
 
 ---
 
 ## Architecture
 
-### Dual Runtime
+### Dual runtime
 
-The app detects whether it is running inside Tauri at runtime via `window.__TAURI_INTERNALS__` (see `src/utils/fileManager.js:isDesktopApp()`). Every Tauri API import is done **dynamically** (via `import()`) so the web build does not fail when those modules are unavailable. Always preserve this pattern when adding new Tauri features.
+Tauri is detected at runtime via `window.__TAURI_INTERNALS__` (`isDesktopApp()` in `src/utils/fileManager.ts`). Every Tauri import is **dynamic** (`await import('@tauri-apps/…')`) so the web build never loads Tauri modules at startup. Preserve this when adding native features.
 
-### State Flow
+### State flow
 
-All global state lives in `App.jsx` and is composed from custom hooks:
+`App.tsx` composes these hooks and passes state down as props (no React context):
 
 | Hook | Responsibility |
 |------|---------------|
-| `useTabs` | Multi-document tab state (open, close, switch, dirty tracking) |
-| `useTheme` | Dark/light theme, persisted to `localStorage` |
-| `useLinter` | Markdown linting with 400ms debounce, persisted strictness |
-| `useRecentFiles` | Last 10 opened files, persisted to `localStorage` |
-| `useToast` | Transient success/error/warning/info notifications |
+| `useSettings` | Single source of truth for user settings (theme, editor mode, lint, auto-save, word wrap, sync scroll, font size, recent files, custom shortcuts). Persists to `localStorage` and, on desktop, the Tauri Store |
+| `useTabs` | Multi-document tabs: open, close, switch, reorder, dirty tracking |
+| `useLinter` | Debounced linting driven by `settings.lint` |
+| `useAutoSave` | Saves the dirty active tab after `settings.autoSave.interval` |
+| `useShortcuts` / `useCommands` | Keyboard shortcuts and the command registry (`src/commands/registry.ts`) used by the command palette |
+| `useOutline` | Heading outline for the sidebar |
+| `useSyncScroll` | Scroll sync between panes in split mode |
+| `useContextMenu` | Tab and editor context menus |
+| `useToast` | Transient notifications |
 
-State is passed down as props; there is no context or global store.
+`useTheme` and `useRecentFiles` still exist as standalone hooks (with tests) but `App.tsx` reads theme and recent files from `useSettings`.
 
-### Editor Modes
+### Editor modes
 
-Three modes are rendered by `App.jsx`'s `renderEditor()` function:
+`App.tsx` renders one of three modes (`settings.editorMode`):
 
-- **`wysiwyg`** — `<MilkdownEditor>` only (Crepe/ProseMirror)
-- **`source`** — `<SourceEditor>` only (`<textarea>` with line numbers; transparent text over a highlight.js `<pre>` overlay for syntax colouring)
-- **`split`** — both side-by-side inside `.split-view`
+- **`wysiwyg`** — `<MilkdownEditor>` (Milkdown Crepe / ProseMirror). Code blocks are highlighted with **shiki** (`src/utils/highlight.ts`); math via KaTeX and diagrams via Mermaid (`src/utils/mathRenderer.ts`, `mermaidRenderer.ts`).
+- **`source`** — `<SourceEditor>`: a `<textarea>` with transparent text layered over a `<pre>` that **highlight.js** (core + markdown only) fills with token-classed HTML. Both layers share padding, font size, line height, wrap mode and scrollbar gutter; if you change one, change the other.
+- **`split`** — both side by side.
 
-`editorMode` is persisted to `localStorage` under `mdviewer-editor-mode`.
+Bumping `editorContentKey` (the `key` on `<MilkdownEditor>`) forces a full editor remount; Milkdown has no controlled-update API.
 
-When loading external content into the WYSIWYG editor, the `key={editorContentKey}` prop is bumped to force a React remount — this is intentional because Milkdown does not support controlled updates without destroying and recreating the instance.
+### Themes
+
+`src/themes/index.ts` defines built-in themes (`dark`, `light`, `github-dark`, `solarized-dark`, `solarized-light`). `applyTheme()` writes each theme's colours as CSS custom properties on `<html>` and sets `data-theme` to `dark`/`light`. Component CSS must use `var(--token)` — never hardcode colours — so every theme works automatically.
 
 ---
 
 ## Directory Structure
 
 ```
-MDViewer/
-├── src/
-│   ├── App.jsx                  # Root component — orchestrates all state and layout
-│   ├── main.jsx                 # React entry point
-│   ├── index.css                # Design system: CSS variables, resets, layout primitives
-│   ├── App.css                  # Top-level layout (app, app-body, split-view, editor-pane)
-│   ├── components/
-│   │   ├── MilkdownEditor.jsx   # WYSIWYG editor (Milkdown Crepe wrapper)
-│   │   ├── SourceEditor.jsx     # Raw markdown textarea with line numbers
-│   │   ├── EditorModeToggle.jsx # WYSIWYG / Source / Split segmented control
-│   │   ├── TitleBar.jsx         # Custom frameless window titlebar (desktop only)
-│   │   ├── TabBar.jsx           # Multi-document tab strip
-│   │   ├── Sidebar.jsx          # File explorer with lazy-loaded directory tree
-│   │   ├── FindReplace.jsx      # Find & Replace panel (operates on raw markdown)
-│   │   ├── WelcomeScreen.jsx    # Shown when editor is empty; recent files list
-│   │   ├── ConfirmDialog.jsx    # Save-before-close modal
-│   │   ├── StatusBar.jsx        # Lint summary, word/char count, theme toggle, mode toggle
-│   │   └── ToastContainer.jsx   # Positioned toast notification stack
-│   ├── hooks/
-│   │   ├── useTabs.js
-│   │   ├── useTheme.js
-│   │   ├── useLinter.js
-│   │   ├── useRecentFiles.js
-│   │   └── useToast.js
-│   └── utils/
-│       ├── fileManager.js       # openFile / saveFile / saveFileAs / getFileName / isDesktopApp
-│       ├── linter.js            # Rule-based markdown linter (lintMarkdown, getAllRules, STRICTNESS_OPTIONS)
-│       └── pdfExport.js         # Print-to-PDF via hidden iframe
-├── src-tauri/
-│   ├── src/
-│   │   ├── lib.rs               # Tauri app setup — registers plugins
-│   │   └── main.rs              # Desktop entry point, calls lib::run()
-│   ├── Cargo.toml               # Rust dependencies
-│   ├── tauri.conf.json          # App metadata, window config, CSP, bundle targets
-│   └── capabilities/default.json  # Tauri permission grants
-├── .github/workflows/release.yml  # CI: build & publish on `v*` tags
-├── vite.config.js
-├── eslint.config.js
-└── package.json
+src/
+├── App.tsx / App.css        # Orchestrates hooks, layout, editor modes
+├── main.tsx / index.css     # Entry point; base tokens and resets
+├── commands/registry.ts     # Command definitions for palette + shortcuts
+├── components/              # One .tsx + co-located .css per component
+│   ├── MilkdownEditor.tsx   # WYSIWYG (Crepe) with shiki/KaTeX/Mermaid
+│   ├── SourceEditor.tsx     # Textarea + highlight.js overlay
+│   ├── TabBar.tsx           # Tabs, drag-to-reorder, context menu
+│   ├── Sidebar.tsx / Outline.tsx
+│   ├── FindReplace.tsx      # CSS Highlight API; replace edits raw markdown
+│   ├── CommandPalette.tsx / SettingsPanel.tsx / ContextMenu.tsx
+│   ├── StatusBar.tsx / EditorModeToggle.tsx / TitleBar.tsx
+│   └── WelcomeScreen.tsx / ConfirmDialog.tsx / ToastContainer.tsx
+├── hooks/                   # See table above
+├── themes/index.ts
+├── types/                   # Tab, AppSettings, Lint, Command, Toast types
+├── utils/                   # fileManager, linter, highlight, pdfExport, image/math/mermaid
+└── test/                    # Vitest + Testing Library, mirrors src/ layout
+src-tauri/                   # Rust shell: lib.rs registers plugins; tauri.conf.json
+.github/workflows/           # ci.yml (PR checks), release.yml (tagged releases)
 ```
 
 ---
 
 ## Key Conventions
 
-### JavaScript / React
+- **Functional components only**; default export for components, named export for hooks and utils.
+- Type props with an `interface XxxProps`; put types shared across files in `src/types/`.
+- `useCallback` for handlers passed as props or used in effect dependencies. Don't silence `react-hooks/exhaustive-deps` without a comment explaining why.
+- Unused variables must start with `_` or an uppercase letter to be exempt from `@typescript-eslint/no-unused-vars`.
+- In `catch (err)`, `err` is `unknown` — narrow with `err instanceof Error` before reading `.message`.
+- **Tests:** add or update a test in `src/test/` alongside any behaviour change. Tauri modules are mocked in `src/test/setup.ts`.
 
-- **Functional components only.** No class components.
-- **`useCallback` for all event handlers** passed as props or used in `useEffect` dependency arrays.
-- **Named exports for hooks** (`export function useFoo`), **default exports for components**.
-- **Co-located CSS** — each component has a matching `.css` file in the same directory.
-- Unused variable lint rule: `no-unused-vars` with `varsIgnorePattern: '^[A-Z_]'` — uppercase-only names (e.g., constants) are exempted.
-- Do not use TypeScript. Use JSDoc where documentation is warranted.
-- Tauri APIs must always be imported dynamically: `await import('@tauri-apps/plugin-*')`. Never import them at the module top level.
+### Linter engine (`src/utils/linter.ts`)
 
-### CSS
+Custom rule engine (no `markdownlint` dependency). Each rule in `RULES` has a `level` (`relaxed` | `standard` | `strict`, cumulative), a `severity` (`error` | `warning` | `info`) and `check(lines: string[])` returning `{ line, column, message }[]`. Rule counts in `STRICTNESS_OPTIONS` are derived automatically. Current rules: MD001, MD004, MD009, MD012, MD013, MD018, MD022, MD025, MD031, MD032, MD037, MD047.
 
-- All design tokens (colors, spacing, font sizes, border radii) are declared as CSS custom properties in `src/index.css` under `:root` and `[data-theme="dark"]`.
-- Theme switching is applied via the `data-theme` attribute on `<div class="app">` (and mirrored to `document.documentElement` by `useTheme`).
-- Never hardcode color values in component CSS files — always use `var(--token-name)`.
+### Adding a native capability
 
-### localStorage Keys
-
-All persisted settings share the `mdviewer-` prefix:
-
-| Key | Value |
-|-----|-------|
-| `mdviewer-theme` | `"dark"` \| `"light"` |
-| `mdviewer-editor-mode` | `"wysiwyg"` \| `"source"` \| `"split"` |
-| `mdviewer-lint-strictness` | `"relaxed"` \| `"standard"` \| `"strict"` |
-| `mdviewer-lint-enabled` | `"true"` \| `"false"` |
-| `mdviewer-recent-files` | JSON array of `{ path, filename, openedAt }` |
-
-### Tauri Rust Backend
-
-The Rust side (`src-tauri/src/lib.rs`) is intentionally minimal — it only registers plugins. All business logic lives in the JavaScript frontend. When adding new native capabilities:
-1. Add the plugin to `Cargo.toml`
-2. Register it in `lib.rs`
-3. Grant permissions in `capabilities/default.json`
-4. Import it dynamically in `src/utils/` with a browser fallback
-
----
-
-## Linter Engine (`src/utils/linter.js`)
-
-The linter is a custom rule-based engine (no `markdownlint` dependency). Rules are defined in the `RULES` object and each has:
-
-- `level`: `"relaxed"` | `"standard"` | `"strict"` — determines which strictness presets include the rule
-- `severity`: `"error"` | `"warning"` | `"info"`
-- `check(lines: string[])`: returns an array of `{ line, column, message }` objects
-
-Strictness levels are cumulative: `strict` includes all `relaxed` + `standard` + `strict` rules.
-
-Current rules: MD001, MD004, MD009, MD012, MD013, MD018, MD022, MD025, MD031, MD032, MD037, MD047.
-
-When adding a new rule, follow the existing pattern: add it to `RULES`, assign a level and severity, and export updated `STRICTNESS_OPTIONS` counts automatically (they are derived).
-
----
-
-## MilkdownEditor Lifecycle Notes
-
-`MilkdownEditor.jsx` wraps the Milkdown Crepe editor. Important behaviors to be aware of:
-
-- The editor is **uncontrolled** after initialization. External content changes (file opens, find-replace) trigger a full `destroy()` + `initEditor()` cycle.
-- The `key={editorContentKey}` on `<MilkdownEditor>` in `App.jsx` is the primary mechanism for forcing remounts; bump `editorContentKey` whenever you need a fresh editor instance.
-- `editorInstanceRef.current` exposes `{ getMarkdown(), setContent() }` so the parent can read the current markdown before save operations.
-- The `// eslint-disable-line react-hooks/exhaustive-deps` suppressions in this file are intentional — the `useEffect` for initialization must only run once on mount.
-- `setContent` calls `initEditor` through `_initRef` (synced in a `useEffect`) to avoid a circular forward reference between the two callbacks.
-
----
-
-## File I/O Pattern (`src/utils/fileManager.js`)
-
-All file operations follow this pattern:
-1. Call `ensureTauri()` — lazy-loads Tauri plugins; returns `false` in browsers.
-2. If Tauri is available: use native dialogs (`tauriDialog`) and filesystem (`tauriFs`).
-3. If not: use browser fallbacks (`<input type="file">` for open, `<a download>` for save).
-
-Supported file extensions: `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`, `.txt`.
+1. Add the plugin to `src-tauri/Cargo.toml`
+2. Register it in `src-tauri/src/lib.rs`
+3. Grant permissions in `src-tauri/capabilities/default.json`
+4. Import it dynamically from `src/utils/` with a browser fallback, and mock it in `src/test/setup.ts`
 
 ---
 
 ## Release / CI
 
-Releases are triggered by pushing a `v*` tag (e.g., `v1.0.0`). The GitHub Actions workflow (`.github/workflows/release.yml`) builds native installers for:
-
-- **Ubuntu 22.04** — `.AppImage`, `.deb`
-- **macOS** — universal binary `.dmg` (`x86_64` + `aarch64`)
-- **Windows** — `.msi` and NSIS `.exe` (`bundle.targets: "all"` in `tauri.conf.json`)
-
-The workflow publishes the release immediately (`releaseDraft: false`). Tag from `main` after merging.
-
-A husky pre-commit hook runs `npm run lint`; lint must be clean (0 errors, 0 warnings) to commit.
-
----
+- **`ci.yml`** — on pushes and PRs to `main`: lint → typecheck → test with coverage → build.
+- **`release.yml`** — on `v*` tags: builds installers on Ubuntu (`.deb`, `.AppImage`), Windows (`.msi`, NSIS `.exe`; `bundle.targets: "all"`) and macOS (universal `.dmg`), and publishes the GitHub release immediately (`releaseDraft: false`). It is currently marked `prerelease: true` for the beta series — flip it to `false` for a stable release.
+- Keep `version` in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` in sync, then tag from `main`.
 
 ## Planning Docs
 
-- `ROADMAP.md` — milestone checklist; tick items off as they ship.
+- `ROADMAP.md` — milestone checklist; tick items as they ship.
 - `CHANGELOG.md` — Keep-a-Changelog format; add every user-facing change under `[Unreleased]`.
-
----
-
-## Testing
-
-There is currently no automated test suite. When adding tests, prefer:
-- Unit tests for pure utility functions in `src/utils/`
-- Integration tests for hooks using React Testing Library
 
 ---
 
 ## Common Pitfalls
 
-1. **Don't import Tauri plugins at the top level.** Always use dynamic `import()` inside functions. The web build has no Tauri runtime and will error at module load time.
-2. **Don't use `key` on `<MilkdownEditor>` carelessly.** Each key change destroys and rebuilds the ProseMirror instance, which is expensive. Only bump `editorContentKey` when content must be replaced wholesale.
-3. **`useTabs` never closes the last tab** — it resets it to a blank untitled state. Don't add logic that assumes tabs can be fully empty.
-4. **The `activeTabIdRef`** in `App.jsx` tracks the active tab ID in a ref so that event handlers (keyboard shortcuts, drag-drop) always see the current tab without stale closures.
-5. **Sidebar is Tauri-only.** `openFolder` and `handleFileClick` do nothing in a browser. This is expected behavior.
+1. **Top-level Tauri imports** break the web build — always `await import()` inside a function.
+2. **Remounting `<MilkdownEditor>`** (via `editorContentKey`) is expensive; only do it when content must be replaced wholesale.
+3. **`useTabs` never removes the last tab** — it resets it to a blank "Untitled" tab.
+4. **Source overlay drift:** any style that affects text layout on `.source-textarea` must be mirrored on `.source-highlight`, or colours will misalign with the caret.
+5. **Sidebar file browsing is Tauri-only**; in the browser it is a no-op by design.
