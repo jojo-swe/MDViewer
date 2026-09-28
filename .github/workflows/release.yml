@@ -51,6 +51,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Fails before the slow native build if the tag and version files disagree,
+      # or the version can't be built as a Windows MSI (text pre-releases like -beta.1).
+      - name: Check version
+        run: npm run check:version
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -60,5 +65,6 @@ jobs:
           releaseName: "MDViewer ${{ github.ref_name }}"
           releaseBody: "See the release notes for full changelog."
           releaseDraft: false
-          prerelease: true
+          # Versions with a pre-release part (v0.2.0-2) are pre-releases; v0.2.0 is not.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}

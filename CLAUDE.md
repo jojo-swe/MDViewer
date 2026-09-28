@@ -126,9 +126,14 @@ Custom rule engine (no `markdownlint` dependency). Each rule in `RULES` has a `l
 
 ## Release / CI
 
-- **`ci.yml`** — on pushes and PRs to `main`: lint → typecheck → test with coverage → build.
-- **`release.yml`** — on `v*` tags: builds installers on Ubuntu (`.deb`, `.AppImage`), Windows (`.msi`, NSIS `.exe`; `bundle.targets: "all"`) and macOS (universal `.dmg`), and publishes the GitHub release immediately (`releaseDraft: false`). It is currently marked `prerelease: true` for the beta series — flip it to `false` for a stable release.
-- Keep `version` in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` in sync, then tag from `main`.
+- **`ci.yml`** — on pushes and PRs to `main`: version check → lint → typecheck → test with coverage → build.
+- **`release.yml`** — on `v*` tags: builds installers on Ubuntu (`.deb`, `.AppImage`, `.rpm`), Windows (`.msi`, NSIS `.exe`; `bundle.targets: "all"`) and macOS (universal `.dmg`), and publishes the GitHub release immediately. Tags with a pre-release part (`v0.2.0-2`) are marked as pre-releases; plain `vX.Y.Z` tags are normal releases.
+
+### Versioning rules (enforced by `npm run check:version`)
+
+- `version` must be identical in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (refresh the lockfiles with `npm install --package-lock-only` and `cargo update -w`).
+- **Pre-releases must be numeric**: `0.2.0-2`, never `0.2.0-beta.2`. The Windows MSI bundler rejects text pre-release identifiers, which fails the Windows job and leaves the release without `.msi`/`.exe` files (this is what happened to `v0.2.0-beta.1`).
+- The release tag must be `v` + the version. To release: bump the version, merge to `main`, then `git tag vX.Y.Z[-N] && git push origin vX.Y.Z[-N]`.
 
 ## Planning Docs
 

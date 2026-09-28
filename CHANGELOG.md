@@ -13,6 +13,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Syntax highlighting in the Source editor: highlight.js (core + markdown only) renders a colour-coded layer behind the transparent textarea, using theme CSS variables so every built-in theme works; follows the font size and word-wrap settings
 - Tab drag-and-drop reordering using the native HTML5 drag API; the dragged tab fades and a left accent bar marks the drop target
 - Pre-commit hook (husky) that runs `npm run lint`
+- `npm run check:version` (run in CI and before release builds): versions must match across `package.json`, `tauri.conf.json` and `Cargo.toml`, pre-releases must be numeric so the Windows MSI builds, and the tag must match the version
+
+### Changed
+- Pre-release versions are now numeric (`0.2.0-2` instead of `0.2.0-beta.2`) so the Windows build succeeds and releases include the `.msi` and `.exe`
+- Release workflow marks a release as a pre-release based on its tag (`v0.2.0-2` → pre-release, `v0.2.0` → normal release)
 
 ### Fixed
 - MD047 (single trailing newline) was a no-op stub; it now flags files that don't end with a newline
