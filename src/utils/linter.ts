@@ -308,12 +308,14 @@ const RULES: Record<string, LintRule> = {
     severity: "info",
     check: (lines: string[]) => {
       const issues: Array<{ line: number; column: number; message: string }> = [];
-      if (lines.length > 0) {
-        const lastLine = lines[lines.length - 1];
-        if (lastLine.trim() !== "") {
-          // File doesn't end with newline — we can't truly check this from split lines
-          // but we can flag if last line has content
-        }
+      // When a string ends with \n, split('\n') produces a trailing empty string.
+      // If the last element is non-empty, the file is missing its final newline.
+      if (lines.length > 0 && lines[lines.length - 1] !== "") {
+        issues.push({
+          line: lines.length,
+          column: lines[lines.length - 1].length + 1,
+          message: "File should end with a single newline character.",
+        });
       }
       return issues;
     },

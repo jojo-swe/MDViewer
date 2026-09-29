@@ -1,13 +1,14 @@
 {
   "name": "mdviewer",
   "private": true,
-  "version": "0.2.0-beta.1",
+  "version": "0.2.0-2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:version": "node scripts/check-version.mjs",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -15,7 +16,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "prepare": "husky"
   },
   "dependencies": {
     "@milkdown/core": "^7.18.0",
@@ -36,9 +38,9 @@
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-store": "^2.4.2",
     "@types/katex": "^0.16.8",
+    "highlight.js": "^11.11.1",
     "katex": "^0.17.0",
     "lucide-react": "^0.575.0",
-    "markdownlint": "^0.40.0",
     "mermaid": "^11.16.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -61,6 +63,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.63.0",

@@ -53,4 +53,29 @@ describe('TabBar', () => {
     fireEvent.click(screen.getByTitle('New Tab'));
     expect(onNew).toHaveBeenCalled();
   });
+
+  it('calls onReorder with source and target indices on drop', () => {
+    const onReorder = vi.fn();
+    const tabs = [
+      makeTab({ id: 1, filename: 'a.md' }),
+      makeTab({ id: 2, filename: 'b.md' }),
+      makeTab({ id: 3, filename: 'c.md' }),
+    ];
+    render(<TabBar tabs={tabs} activeId={1} onSwitch={vi.fn()} onClose={vi.fn()} onNew={vi.fn()} onReorder={onReorder} />);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(document.getElementById('tab-1')!, { dataTransfer });
+    fireEvent.dragEnter(document.getElementById('tab-3')!, { dataTransfer });
+    fireEvent.drop(document.getElementById('tab-3')!, { dataTransfer });
+    expect(onReorder).toHaveBeenCalledWith(0, 2);
+  });
+
+  it('does not reorder when dropping a tab on itself', () => {
+    const onReorder = vi.fn();
+    const tabs = [makeTab({ id: 1, filename: 'a.md' }), makeTab({ id: 2, filename: 'b.md' })];
+    render(<TabBar tabs={tabs} activeId={1} onSwitch={vi.fn()} onClose={vi.fn()} onNew={vi.fn()} onReorder={onReorder} />);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(document.getElementById('tab-2')!, { dataTransfer });
+    fireEvent.drop(document.getElementById('tab-2')!, { dataTransfer });
+    expect(onReorder).not.toHaveBeenCalled();
+  });
 });

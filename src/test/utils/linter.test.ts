@@ -53,6 +53,18 @@ describe('linter', () => {
       expect(result.summary.errors).toBeGreaterThan(0);
     });
 
+    it('flags a missing trailing newline (MD047) at strict level', () => {
+      const result = lintMarkdown('# Title\n\nNo newline at end', 'strict');
+      const md047 = result.issues.find((i: LintIssue) => i.ruleId === 'MD047');
+      expect(md047).toBeDefined();
+      expect(md047?.line).toBe(3);
+    });
+
+    it('does not flag MD047 when the file ends with a newline', () => {
+      const result = lintMarkdown('# Title\n\nEnds cleanly\n', 'strict');
+      expect(result.issues.find((i: LintIssue) => i.ruleId === 'MD047')).toBeUndefined();
+    });
+
     it('respects strictness levels - strict catches more than relaxed', () => {
       const md = '# Title\n\n## Sub\n\nSome text\n\n- item\n* item\n';
       const relaxedResult = lintMarkdown(md, 'relaxed');

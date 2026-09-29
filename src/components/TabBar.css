@@ -119,6 +119,16 @@
   background: var(--bg-active);
 }
 
+/* --- Drag and Drop --- */
+.tab--dragging {
+  opacity: 0.45;
+}
+
+.tab--drag-over {
+  background: var(--bg-hover);
+  box-shadow: inset 2px 0 0 var(--accent-primary);
+}
+
 /* --- New Tab Button --- */
 .tab-new {
   display: flex;

@@ -58,6 +58,7 @@ function App() {
     markSaved,
     openInTab,
     cycleTab,
+    reorderTabs,
   } = useTabs();
 
   const toast = useToast();
@@ -579,6 +580,7 @@ function App() {
         onClose={handleCloseTab}
         onNew={handleNewTab}
         onContextMenu={handleTabContextMenu}
+        onReorder={reorderTabs}
       />
 
       <div className="app-body">
