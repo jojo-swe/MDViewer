@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0-3] - 2026-10-24
+
+### Fixed
+
+- Linux pre-release packaging now publishes `.deb` and AppImage bundles without attempting an RPM build, whose version grammar rejects SemVer pre-release hyphens
+
 ## [0.2.0-2] - 2026-10-24
 
 ### Added
@@ -99,7 +105,8 @@ Initial public release.
 - **Graceful browser fallbacks** for all file operations (open via `<input>`, save via download)
 - **GitHub Actions CI** — automated cross-platform builds (Windows, macOS universal, Linux) on `v*` tag pushes
 
-[Unreleased]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-2...HEAD
+[Unreleased]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-3...HEAD
+[0.2.0-3]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-2...v0.2.0-3
 [0.2.0-2]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-beta.1...v0.2.0-2
 [0.2.0-beta.1]: https://github.com/jojo-swe/MDViewer/compare/v0.1.1...v0.2.0-beta.1
 [0.1.0]: https://github.com/jojo-swe/MDViewer/releases/tag/v0.1.0

@@ -15,7 +15,9 @@ jobs:
       matrix:
         include:
           - platform: "ubuntu-22.04"
-            args: ""
+            # RPM rejects SemVer pre-release versions such as 0.2.0-3.
+            # Publish the portable AppImage and Debian package on Linux.
+            args: "--bundles deb,appimage"
           - platform: "macos-latest"
             args: "--target universal-apple-darwin"
           - platform: "windows-latest"
@@ -65,6 +67,6 @@ jobs:
           releaseName: "MDViewer ${{ github.ref_name }}"
           releaseBody: "See the release notes for full changelog."
           releaseDraft: false
-          # Versions with a pre-release part (v0.2.0-2) are pre-releases; v0.2.0 is not.
+          # Versions with a pre-release part (v0.2.0-3) are pre-releases; v0.2.0 is not.
           prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}

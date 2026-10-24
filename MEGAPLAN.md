@@ -1,6 +1,6 @@
 # MDViewer Megaplan
 
-Status: `v0.2.0-2` release candidate in preparation
+Status: `v0.2.0-3` release candidate in preparation
 Planning horizon: beta hardening through `v1.0`
 Primary target: reliable, fast, cross-platform desktop Markdown editing
 
@@ -434,7 +434,7 @@ Exit gate: a release candidate survives a full clean-machine matrix, recovery dr
 
 ## 13. Suggested milestone map
 
-### `v0.2.0-2` — Data safety
+### `v0.2.0-3` — Data safety
 
 - Complete P0 and P1.
 - Add App/document-service integration tests.

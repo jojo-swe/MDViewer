@@ -50,8 +50,8 @@ After the release candidate is merged to `main` and CI passes on that exact comm
 ```bash
 git switch main
 git pull --ff-only
-git tag v0.2.0-2
-git push origin v0.2.0-2
+git tag v0.2.0-3
+git push origin v0.2.0-3
 ```
 
 The `Release` workflow publishes automatically. Verify that all three matrix jobs pass and that the GitHub release contains usable Windows, macOS, and Linux bundles. Download at least the Windows installer and repeat the basic open/edit/save/reopen smoke test from the installed build.

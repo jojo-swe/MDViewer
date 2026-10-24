@@ -1,6 +1,6 @@
 [package]
 name = "mdviewer"
-version = "0.2.0-2"
+version = "0.2.0-3"
 description = "A powerful, lightweight Markdown editor"
 authors = ["MDViewer Contributors"]
 license = "MIT"
