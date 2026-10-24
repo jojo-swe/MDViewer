@@ -11,6 +11,32 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0-1] - 2026-10-24
+
+### Fixed
+
+- Opened and recovered documents now initialize the real Milkdown editor with their actual content instead of the welcome document
+- The desktop title-bar close button now enters the same save/discard/cancel queue as an operating-system close request
+- Manual saves use authoritative tab state after switching editor modes and editor references are cleared on unmount
+- Crash recovery prioritizes dirty and active tabs across the full tab set, retries reduced snapshots after quota failures, warns when protection is incomplete, and removes plaintext snapshots after a clean exit
+- Desktop drag-and-drop opens an unsaved copy so a basename can never be mistaken for the original native path
+- Pasted desktop images are written beside an approved document through a scoped native command instead of silently falling back because a file path was treated as a directory
+
+### Security
+
+- Existing-file writes require a dialog-approved path; symbolic-link destinations are rejected, same-process writes are serialized, Unix mode bits are preserved, and Windows uses `ReplaceFileW` to retain ACLs and file attributes
+- Documents are limited to 5 MiB before reading and enhanced rendering is bounded to 50 code blocks of at most 100,000 characters each
+- Removed the remaining nested vulnerable KaTeX version; `npm audit` now reports zero findings
+- GitHub Actions are pinned to full commit SHAs, release publication is tag-only, and an automated quality gate runs the complete frontend and Rust checks before build publication
+- Stable unsigned releases are blocked until Windows signing, Apple notarization, and clean-machine acceptance are configured
+
+### Changed
+
+- Source builds now require Node.js 20.19 or later
+- Version validation now includes both lockfiles
+
+---
+
 ## [0.2.0-3] - 2026-10-24
 
 ### Fixed
@@ -105,7 +131,8 @@ Initial public release.
 - **Graceful browser fallbacks** for all file operations (open via `<input>`, save via download)
 - **GitHub Actions CI** — automated cross-platform builds (Windows, macOS universal, Linux) on `v*` tag pushes
 
-[Unreleased]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-3...HEAD
+[Unreleased]: https://github.com/jojo-swe/MDViewer/compare/v0.4.0-1...HEAD
+[0.4.0-1]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-3...v0.4.0-1
 [0.2.0-3]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-2...v0.2.0-3
 [0.2.0-2]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-beta.1...v0.2.0-2
 [0.2.0-beta.1]: https://github.com/jojo-swe/MDViewer/compare/v0.1.1...v0.2.0-beta.1

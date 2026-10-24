@@ -30,6 +30,25 @@ describe('useSessionRecovery', () => {
 
     act(() => result.current.markCleanExit());
     expect(loadRecoverySession().state).toBeNull();
-    expect(JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!).cleanExit).toBe(true);
+    expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it('reports a recovery persistence failure once until storage succeeds again', () => {
+    const onFailure = vi.fn();
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+    const { rerender } = renderHook(
+      ({ tabs }) => useSessionRecovery(tabs, tabs[0].id, onFailure),
+      { initialProps: { tabs: [draft] } }
+    );
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(onFailure).toHaveBeenCalledTimes(1);
+
+    rerender({ tabs: [{ ...draft, content: 'newer' }] });
+    act(() => vi.advanceTimersByTime(300));
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    setItem.mockRestore();
   });
 });

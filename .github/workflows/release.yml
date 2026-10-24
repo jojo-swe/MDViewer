@@ -4,10 +4,52 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
+  quality:
+    name: Release quality gate
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libacl1-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify release candidate
+        run: |
+          npm run check:version
+          npm run lint
+          npm run typecheck
+          npm run test:coverage
+          npm run build
+          npm audit --audit-level=low
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          cargo test --manifest-path src-tauri/Cargo.toml
+          cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+          git diff --check
+
   release:
+    needs: quality
     permissions:
       contents: write
     strategy:
@@ -26,27 +68,29 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libacl1-dev patchelf
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "lts/*"
+          node-version: 20.19.0
           cache: "npm"
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
         with:
           workspaces: "./src-tauri -> target"
 
@@ -58,8 +102,11 @@ jobs:
       - name: Check version
         run: npm run check:version
 
+      - name: Require a prerelease tag until signing is configured
+        run: node -e "if (!process.env.GITHUB_REF_NAME.includes('-')) { console.error('Stable releases are blocked until Windows signing, Apple notarization, and clean-machine acceptance are configured.'); process.exit(1); }"
+
       - name: Build the app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@fce9c6108b31ea247710505d3aaaa893ee6768d4 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

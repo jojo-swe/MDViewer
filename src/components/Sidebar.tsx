@@ -12,6 +12,7 @@ import {
   FolderTree,
 } from 'lucide-react';
 import './Sidebar.css';
+import { readTextFile } from '../utils/fileManager';
 import './Outline.css';
 import Outline from './Outline';
 import type { Heading } from '../hooks/useOutline';
@@ -189,10 +190,8 @@ export default function Sidebar({ visible, onClose, onFileOpen, mode, onModeChan
 
   const handleFileClick = useCallback(
     async (filePath: string) => {
-      const hasTauri = await ensureTauri();
-      if (!hasTauri || !tauriFs) return;
       try {
-        const content = await tauriFs.readTextFile(filePath);
+        const content = await readTextFile(filePath);
         onFileOpen(filePath, content);
       } catch (err) {
         console.error('Failed to read file:', err);

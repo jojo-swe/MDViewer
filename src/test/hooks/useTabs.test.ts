@@ -144,6 +144,21 @@ describe('useTabs', () => {
     expect(result.current.activeTab?.isDirty).toBe(false);
   });
 
+  it('keeps a dropped desktop copy unsaved and dirty', () => {
+    const { result } = renderHook(() => useTabs());
+    act(() => {
+      result.current.openInTab(null, '# Dropped', 'dropped.md', true);
+    });
+
+    expect(result.current.activeTab).toEqual(expect.objectContaining({
+      path: null,
+      filename: 'dropped.md',
+      content: '# Dropped',
+      savedContent: '',
+      isDirty: true,
+    }));
+  });
+
   it('cycles tabs forward', () => {
     const { result } = renderHook(() => useTabs());
     act(() => { result.current.createTab(); });

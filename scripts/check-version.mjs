@@ -11,11 +11,16 @@ import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const read = (p) => readFileSync(fileURLToPath(new URL(p, root)), 'utf8');
+const packageLock = JSON.parse(read('package-lock.json'));
+const cargoLock = read('src-tauri/Cargo.lock');
 
 const versions = {
   'package.json': JSON.parse(read('package.json')).version,
+  'package-lock.json': packageLock.version,
+  'package-lock.json packages[""]': packageLock.packages?.['']?.version,
   'src-tauri/tauri.conf.json': JSON.parse(read('src-tauri/tauri.conf.json')).version,
   'src-tauri/Cargo.toml': read('src-tauri/Cargo.toml').match(/^version\s*=\s*"([^"]+)"/m)?.[1],
+  'src-tauri/Cargo.lock': cargoLock.match(/\[\[package\]\]\s+name\s*=\s*"mdviewer"\s+version\s*=\s*"([^"]+)"/m)?.[1],
 };
 
 const errors = [];

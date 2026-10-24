@@ -158,7 +158,7 @@ Grab the latest release for your platform from [**Releases**](https://github.com
 
 ### Build from Source
 
-**Prerequisites:** [Node.js](https://nodejs.org/) ≥ 18, [Rust](https://rustup.rs/), [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
+**Prerequisites:** [Node.js](https://nodejs.org/) ≥ 20.19, [Rust](https://rustup.rs/), [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
 
 ```bash
 # Clone the repo

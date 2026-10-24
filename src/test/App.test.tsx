@@ -43,6 +43,8 @@ vi.mock('../utils/fileManager', () => ({
   saveFileAs: vi.fn(),
   getFileName: (path?: string | null) => path?.split(/[\\/]/).pop() || 'Untitled',
   isDesktopApp: () => false,
+  readBrowserTextFile: (file: File) => file.text(),
+  readTextFile: vi.fn(),
 }));
 vi.mock('../utils/pdfExport', () => ({ exportToPDF: vi.fn() }));
 
