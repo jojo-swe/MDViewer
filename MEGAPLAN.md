@@ -1,6 +1,6 @@
 # MDViewer Megaplan
 
-Status: active roadmap after `v0.2.0-beta.1`
+Status: `v0.2.0-2` release candidate in preparation
 Planning horizon: beta hardening through `v1.0`
 Primary target: reliable, fast, cross-platform desktop Markdown editing
 
@@ -42,7 +42,7 @@ Completed in the current development work:
 - Save-time protection against externally changed or deleted files.
 - Versioned, bounded crash-draft recovery for unclean shutdowns.
 - Application integration coverage for the critical save and close paths.
-- 247 passing frontend tests across 34 files, plus 4 Rust filesystem tests.
+- 255 passing frontend tests across 35 files, plus 4 Rust filesystem tests.
 - Coverage floors raised to 70% lines/statements, 65% functions, and 60% branches.
 
 Still pending from Phase 1: proactive filesystem watching, reload/compare UI, and cleanup/recovery for abandoned temporary or backup files. Later phases remain planned below.
@@ -434,7 +434,7 @@ Exit gate: a release candidate survives a full clean-machine matrix, recovery dr
 
 ## 13. Suggested milestone map
 
-### `v0.2.0-beta.2` — Data safety
+### `v0.2.0-2` — Data safety
 
 - Complete P0 and P1.
 - Add App/document-service integration tests.

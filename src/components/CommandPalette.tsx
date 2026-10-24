@@ -50,14 +50,15 @@ export default function CommandPalette({ visible, commands, onClose, onExecute }
 
   // Reset state when opened
   useEffect(() => {
-    if (visible) {
+    if (!visible) return;
+
+    const frame = requestAnimationFrame(() => {
       setQuery('');
       setSelectedIndex(0);
-      // Focus input after render
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-      });
-    }
+      inputRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [visible]);
 
   // Filter commands by fuzzy search
@@ -77,10 +78,10 @@ export default function CommandPalette({ visible, commands, onClose, onExecute }
     return scored.map(({ cmd }) => cmd);
   }, [commands, query]);
 
-  // Reset selected index when query changes
-  useEffect(() => {
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
     setSelectedIndex(0);
-  }, [query]);
+  }, []);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -143,7 +144,7 @@ export default function CommandPalette({ visible, commands, onClose, onExecute }
             type="text"
             placeholder="Type a command..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             autoComplete="off"
             spellCheck={false}
           />

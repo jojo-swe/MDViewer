@@ -189,7 +189,7 @@ npm run tauri build
 | **Desktop** | [Tauri v2](https://tauri.app/) (Rust backend) |
 | **Syntax Highlighting** | [Shiki](https://shiki.style/) (lazy-loaded) |
 | **Diagrams** | [Mermaid](https://mermaid.js.org/) (lazy-loaded) |
-| **Math** | [KaTeX](https://katex.org/) + remark-math |
+| **Math** | [KaTeX](https://katex.org/) via Milkdown's math pipeline |
 | **Icons** | [Lucide React](https://lucide.dev/) |
 | **Linting** | Custom markdown linter with configurable rules |
 | **CI/CD** | GitHub Actions — auto-build on `v*` tags |
@@ -246,7 +246,7 @@ MDViewer/
 │   ├── commands/                # Command registry
 │   │   └── registry.ts          # 20+ commands with shortcuts
 │   ├── types/                   # TypeScript type definitions
-│   └── test/                    # 247 tests across 34 files
+│   └── test/                    # 255 tests across 35 files
 ├── src-tauri/                   # Tauri (Rust) backend
 └── .github/workflows/           # CI/CD release pipeline
 ```
@@ -273,6 +273,8 @@ cd src-tauri
 cargo test
 cargo clippy -- -D warnings
 ```
+
+Maintainers preparing a tagged build should follow the [release checklist](docs/releasing.md).
 
 ---
 
