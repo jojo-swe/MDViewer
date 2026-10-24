@@ -22,7 +22,11 @@ import { useAutoSave } from './hooks/useAutoSave';
 import { useOutline } from './hooks/useOutline';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useContextMenu, type ContextMenuItem } from './hooks/useContextMenu';
-import { openFile, saveFile, saveFileAs, getFileName, isDesktopApp } from './utils/fileManager';
+import { useSessionRecovery } from './hooks/useSessionRecovery';
+import { openFile, getFileName, isDesktopApp } from './utils/fileManager';
+import { saveDocument } from './utils/documentManager';
+import { advanceTabClose, planTabClose } from './utils/closeQueue';
+import { loadRecoverySession } from './utils/sessionManager';
 import { exportToPDF } from './utils/pdfExport';
 import type { Tab } from './types/tab';
 import type { EditorMode } from './types/settings';
@@ -33,11 +37,19 @@ import './App.css';
 interface ConfirmState {
   visible: boolean;
   tabId: number | null;
+  remainingTabIds: number[];
   isWindowClose?: boolean;
 }
 
+const EMPTY_CONFIRM_STATE: ConfirmState = {
+  visible: false,
+  tabId: null,
+  remainingTabIds: [],
+};
+
 function App() {
   const { settings, updateSettings, resetSettings, toggleTheme, toggleLint, setEditorMode, setStrictness } = useSettings();
+  const [recovery] = useState(() => loadRecoverySession());
 
   const sourcePaneRef = useRef<HTMLDivElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
@@ -53,15 +65,19 @@ function App() {
     activeId,
     createTab,
     closeTab,
+    closeTabs,
     switchTab,
     updateContent,
     markSaved,
     openInTab,
     cycleTab,
     reorderTabs,
-  } = useTabs();
+  } = useTabs(recovery.state);
 
   const toast = useToast();
+  const showWarningToast = toast.warning;
+  const { markCleanExit } = useSessionRecovery(tabs, activeId);
+  const recoveryNotifiedRef = useRef(false);
 
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('explorer');
@@ -77,8 +93,9 @@ function App() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
   const [editorContentKey, setEditorContentKey] = useState(0);
-  const [showWelcome, setShowWelcome] = useState(true);
-  const [confirmState, setConfirmState] = useState<ConfirmState>({ visible: false, tabId: null });
+  const [showWelcome, setShowWelcome] = useState(recovery.state === null);
+  const [confirmState, setConfirmState] = useState<ConfirmState>(EMPTY_CONFIRM_STATE);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const editorElementRef = useRef<HTMLDivElement>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
@@ -87,6 +104,14 @@ function App() {
   const activeTabIdRef = useRef<number>(activeId);
   const editorContent = activeTab?.content ?? '';
   const isEmptyEditor = tabs.length === 1 && !activeTab?.path && !activeTab?.content;
+
+  useEffect(() => {
+    if (!recovery.state || recoveryNotifiedRef.current) return;
+    recoveryNotifiedRef.current = true;
+    showWarningToast(recovery.incomplete
+      ? 'Recovered unsaved work after an unclean shutdown. Some oversized tabs could not be restored.'
+      : 'Recovered unsaved work after an unclean shutdown.');
+  }, [recovery, showWarningToast]);
 
   const handleSetEditorMode = useCallback((mode: EditorMode) => {
     setEditorMode(mode);
@@ -171,42 +196,39 @@ function App() {
     [openInTab, addRecentFile, toast]
   );
 
+  const persistTab = useCallback(async (
+    tab: Tab,
+    content: string,
+    options: { forceSaveAs?: boolean; showSuccess?: boolean } = {}
+  ) => {
+    const result = await saveDocument(tab, content, { forceSaveAs: options.forceSaveAs });
+    if (result.status === 'saved') {
+      markSaved(tab.id, result.path, result.content);
+      addRecentFile(result.path, getFileName(result.path));
+      if (options.showSuccess !== false) {
+        toast.success(`${options.forceSaveAs || !tab.path ? 'Saved as' : 'Saved'} ${getFileName(result.path)}`);
+      }
+    } else if (result.status === 'failed') {
+      toast.error(`Save failed: ${result.error.message}`);
+    } else if (result.status === 'conflict') {
+      toast.warning(result.reason === 'deleted'
+        ? `${tab.filename} was deleted outside MDViewer. Use Save As to preserve your changes.`
+        : `${tab.filename} changed outside MDViewer. Your changes were not overwritten.`);
+    }
+    return result;
+  }, [markSaved, addRecentFile, toast]);
+
   const handleSave = useCallback(async () => {
     if (!activeTab) return;
-    try {
-      const currentContent = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
-      if (activeTab.path) {
-        await saveFile(activeTab.path, currentContent);
-        markSaved(activeTab.id, activeTab.path, currentContent);
-        addRecentFile(activeTab.path, getFileName(activeTab.path));
-        toast.success(`Saved ${getFileName(activeTab.path)}`);
-      } else {
-        const savedPath = await saveFileAs(currentContent);
-        if (savedPath) {
-          markSaved(activeTab.id, savedPath, currentContent);
-          addRecentFile(savedPath, getFileName(savedPath));
-          toast.success(`Saved as ${getFileName(savedPath)}`);
-        }
-      }
-    } catch (err) {
-      toast.error(`Save failed: ${(err as Error).message}`);
-    }
-  }, [activeTab, markSaved, addRecentFile, toast]);
+    const currentContent = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
+    await persistTab(activeTab, currentContent);
+  }, [activeTab, persistTab]);
 
   const handleSaveAs = useCallback(async () => {
     if (!activeTab) return;
-    try {
-      const currentContent = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
-      const savedPath = await saveFileAs(currentContent);
-      if (savedPath) {
-        markSaved(activeTab.id, savedPath, currentContent);
-        addRecentFile(savedPath, getFileName(savedPath));
-        toast.success(`Saved as ${getFileName(savedPath)}`);
-      }
-    } catch (err) {
-      toast.error(`Save failed: ${(err as Error).message}`);
-    }
-  }, [activeTab, markSaved, addRecentFile, toast]);
+    const currentContent = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
+    await persistTab(activeTab, currentContent, { forceSaveAs: true });
+  }, [activeTab, persistTab]);
 
   const handleExportPDF = useCallback(() => {
     const title = getFileName(activeTab?.path) || 'Untitled';
@@ -220,10 +242,17 @@ function App() {
   });
 
   // --- Auto-save ---
+  const handleAutoSave = useCallback(async (tab: Tab) => {
+    const result = await persistTab(tab, tab.content, { showSuccess: false });
+    if (result.status === 'failed') throw result.error;
+    if (result.status === 'cancelled') throw new Error('Autosave was cancelled');
+    if (result.status === 'conflict') throw new Error(`Autosave blocked: file was ${result.reason}`);
+  }, [persistTab]);
+
   const { status: autoSaveStatus } = useAutoSave(
     activeTab,
     { enabled: settings.autoSave.enabled, interval: settings.autoSave.interval },
-    { onSave: handleSave }
+    { onSave: handleAutoSave }
   );
 
   // --- Outline ---
@@ -236,93 +265,88 @@ function App() {
   }, [createTab]);
 
   // --- Save-before-close ---
-  const handleCloseTab = useCallback(
-    (id: number) => {
-      const tab = tabs.find((t) => t.id === id);
-      if (tab?.isDirty) {
-        setConfirmState({ visible: true, tabId: id });
-      } else {
-        closeTab(id);
-      }
-    },
-    [tabs, closeTab]
-  );
+  const destroyWindow = useCallback(async () => {
+    markCleanExit();
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().destroy();
+    } catch {
+      // Browser/test environment: there is no native window to destroy.
+    }
+  }, [markCleanExit]);
+
+  const requestCloseTabs = useCallback((ids: number[], isWindowClose = false) => {
+    if (confirmState.visible) return;
+
+    const plan = planTabClose(tabs, ids, isWindowClose);
+    closeTabs(plan.cleanTabIds);
+
+    if (!plan.queue) {
+      if (plan.shouldCloseWindow) void destroyWindow();
+      return;
+    }
+
+    setConfirmState({
+      visible: true,
+      tabId: plan.queue.currentTabId,
+      remainingTabIds: plan.queue.remainingTabIds,
+      isWindowClose: plan.queue.isWindowClose,
+    });
+  }, [confirmState.visible, tabs, closeTabs, destroyWindow]);
+
+  const handleCloseTab = useCallback((id: number) => {
+    requestCloseTabs([id]);
+  }, [requestCloseTabs]);
+
+  const advanceCloseQueue = useCallback(async () => {
+    if (confirmState.tabId === null) return;
+    const next = advanceTabClose({
+      currentTabId: confirmState.tabId,
+      remainingTabIds: confirmState.remainingTabIds,
+      isWindowClose: confirmState.isWindowClose === true,
+    });
+
+    if (next.queue) {
+      setConfirmState({
+        visible: true,
+        tabId: next.queue.currentTabId,
+        remainingTabIds: next.queue.remainingTabIds,
+        isWindowClose: next.queue.isWindowClose,
+      });
+      return;
+    }
+
+    setConfirmState(EMPTY_CONFIRM_STATE);
+    if (next.shouldCloseWindow) await destroyWindow();
+  }, [confirmState.tabId, confirmState.remainingTabIds, confirmState.isWindowClose, destroyWindow]);
 
   const handleConfirmSave = useCallback(async () => {
-    const tabId = confirmState.tabId;
-    const isWindowClose = confirmState.isWindowClose;
-    const tab = tabs.find((t) => t.id === tabId);
-    if (tab) {
-      try {
-        if (tab.path) {
-          await saveFile(tab.path, tab.content);
-          toast.success(`Saved ${getFileName(tab.path)}`);
-        } else {
-          const savedPath = await saveFileAs(tab.content);
-          if (savedPath) toast.success(`Saved as ${getFileName(savedPath)}`);
-        }
-      } catch (err) {
-        toast.error(`Save failed: ${(err as Error).message}`);
-      }
-    }
-    if (tabId !== null) closeTab(tabId);
-    setConfirmState({ visible: false, tabId: null });
+    const tab = tabs.find((candidate) => candidate.id === confirmState.tabId);
+    if (!tab || confirmBusy) return;
 
-    // If this was a window close, check if there are more dirty tabs
-    if (isWindowClose) {
-      const remainingDirty = tabs.filter(t => t.isDirty && t.id !== tabId);
-      if (remainingDirty.length === 0) {
-        // No more dirty tabs, close the window
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
-          await getCurrentWindow().destroy();
-        } catch {
-          // Not in Tauri environment, ignore
-        }
-      } else {
-        // Show dialog for the next dirty tab
-        const nextDirty = remainingDirty[0];
-        setConfirmState({
-          visible: true,
-          tabId: nextDirty.id,
-          isWindowClose: true
-        });
-      }
-    }
-  }, [confirmState.tabId, confirmState.isWindowClose, tabs, closeTab, toast]);
+    setConfirmBusy(true);
+    const result = await persistTab(tab, tab.content);
+    setConfirmBusy(false);
+
+    // Cancellation and failure must never be interpreted as permission to
+    // close. Keep the dialog open so the user can retry, discard, or cancel.
+    if (result.status !== 'saved') return;
+
+    closeTab(tab.id);
+    await advanceCloseQueue();
+  }, [tabs, confirmState.tabId, confirmBusy, persistTab, closeTab, advanceCloseQueue]);
 
   const handleConfirmDiscard = useCallback(async () => {
-    const isWindowClose = confirmState.isWindowClose;
     const tabId = confirmState.tabId;
-    if (tabId !== null) closeTab(tabId);
-    setConfirmState({ visible: false, tabId: null });
-
-    // If this was a window close, check if there are more dirty tabs
-    if (isWindowClose) {
-      const remainingDirty = tabs.filter(t => t.isDirty && t.id !== tabId);
-      if (remainingDirty.length === 0) {
-        // No more dirty tabs, close the window
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
-          await getCurrentWindow().destroy();
-        } catch {
-          // Not in Tauri environment, ignore
-        }
-      } else {
-        // Show dialog for the next dirty tab
-        const nextDirty = remainingDirty[0];
-        setConfirmState({
-          visible: true,
-          tabId: nextDirty.id,
-          isWindowClose: true
-        });
-      }
-    }
-  }, [confirmState.tabId, confirmState.isWindowClose, tabs, closeTab]);
+    if (tabId === null || confirmBusy) return;
+    closeTab(tabId);
+    await advanceCloseQueue();
+  }, [confirmState.tabId, confirmBusy, closeTab, advanceCloseQueue]);
 
   const handleConfirmCancel = useCallback(() => {
-    setConfirmState({ visible: false, tabId: null });
-  }, []);
+    if (confirmBusy) return;
+    setConfirmState(EMPTY_CONFIRM_STATE);
+  }, [confirmBusy]);
 
   // --- Find & Replace ---
   const handleReplace = useCallback(
@@ -383,13 +407,13 @@ function App() {
     e.preventDefault();
     const items: ContextMenuItem[] = [
       { id: 'close', label: 'Close', onClick: () => handleCloseTab(tab.id) },
-      { id: 'close-others', label: 'Close Others', onClick: () => { tabs.filter(t => t.id !== tab.id).forEach(t => handleCloseTab(t.id)); } },
-      { id: 'close-all', label: 'Close All', onClick: () => { tabs.forEach(t => handleCloseTab(t.id)); } },
+      { id: 'close-others', label: 'Close Others', onClick: () => requestCloseTabs(tabs.filter(t => t.id !== tab.id).map(t => t.id)) },
+      { id: 'close-all', label: 'Close All', onClick: () => requestCloseTabs(tabs.map(t => t.id)) },
       { id: 'sep1', separator: true },
       { id: 'copy-path', label: 'Copy Path', disabled: !tab.path, onClick: () => { if (tab.path) navigator.clipboard.writeText(tab.path); } },
     ];
     showContextMenu(e.clientX, e.clientY, items);
-  }, [handleCloseTab, tabs, showContextMenu]);
+  }, [handleCloseTab, requestCloseTabs, tabs, showContextMenu]);
 
   // --- Keyboard shortcuts ---
   const { handleKeyDown: handleShortcut } = useShortcuts(commands, commandContext, settings.customShortcuts);
@@ -446,25 +470,7 @@ function App() {
     const handleWindowClose = async (event: CloseRequestedEvent) => {
       event.preventDefault(); // Prevent immediate close
 
-      const dirtyTabs = tabs.filter(t => t.isDirty);
-      if (dirtyTabs.length === 0) {
-        // No unsaved changes, allow close
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
-          await getCurrentWindow().destroy();
-        } catch {
-          // Not in Tauri environment, ignore
-        }
-        return;
-      }
-
-      // Show save dialog for the first dirty tab
-      const firstDirty = dirtyTabs[0];
-      setConfirmState({
-        visible: true,
-        tabId: firstDirty.id,
-        isWindowClose: true // Flag to indicate this is a window close
-      });
+      requestCloseTabs(tabs.map((tab) => tab.id), true);
     };
 
     const setupListener = async () => {
@@ -487,7 +493,7 @@ function App() {
         unlisten();
       }
     };
-  }, [showTitleBar, tabs]);
+  }, [showTitleBar, tabs, requestCloseTabs]);
 
   // --- Render the editor area based on mode ---
   const renderEditor = () => {
@@ -642,10 +648,11 @@ function App() {
       <ConfirmDialog
         visible={confirmState.visible}
         title="Unsaved Changes"
-        message={`"${getFileName(confirmTab?.path) || 'Untitled'}" has unsaved changes. Save before closing?`}
+        message={`"${getFileName(confirmTab?.path) || 'Untitled'}" has unsaved changes. Save before closing?${confirmState.remainingTabIds.length > 0 ? ` (${confirmState.remainingTabIds.length} more)` : ''}`}
         onConfirm={handleConfirmSave}
         onDanger={handleConfirmDiscard}
         onCancel={handleConfirmCancel}
+        busy={confirmBusy}
       />
 
       <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />

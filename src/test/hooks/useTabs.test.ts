@@ -11,6 +11,22 @@ describe('useTabs', () => {
     expect(result.current.activeTab?.isDirty).toBe(false);
   });
 
+  it('initializes from a recovered session and advances generated IDs', () => {
+    const recovered = {
+      tabs: [
+        { id: 500, path: '/one.md', filename: 'one.md', content: 'one', savedContent: '', isDirty: true },
+        { id: 501, path: '/two.md', filename: 'two.md', content: 'two', savedContent: 'two', isDirty: false },
+      ],
+      activeId: 500,
+    };
+    const { result } = renderHook(() => useTabs(recovered));
+
+    expect(result.current.tabs).toEqual(recovered.tabs);
+    expect(result.current.activeId).toBe(500);
+    act(() => { result.current.createTab(); });
+    expect(result.current.activeId).toBeGreaterThan(501);
+  });
+
   it('creates a new tab', () => {
     const { result } = renderHook(() => useTabs());
     act(() => {
@@ -55,6 +71,19 @@ describe('useTabs', () => {
     expect(result.current.activeId).not.toBe(onlyId);
   });
 
+  it('closes multiple tabs atomically', () => {
+    const { result } = renderHook(() => useTabs());
+    act(() => { result.current.createTab(); });
+    act(() => { result.current.createTab(); });
+    const [first, second] = result.current.tabs;
+
+    act(() => { result.current.closeTabs([first.id, second.id]); });
+
+    expect(result.current.tabs).toHaveLength(1);
+    expect(result.current.tabs[0].id).not.toBe(first.id);
+    expect(result.current.tabs[0].id).not.toBe(second.id);
+  });
+
   it('switches tabs', () => {
     const { result } = renderHook(() => useTabs());
     act(() => {
@@ -87,6 +116,21 @@ describe('useTabs', () => {
     });
     expect(result.current.activeTab?.isDirty).toBe(false);
     expect(result.current.activeTab?.path).toBe('/path/saved.md');
+  });
+
+  it('does not clear newer edits when an older save finishes', () => {
+    const { result } = renderHook(() => useTabs());
+    const id = result.current.activeId;
+    act(() => {
+      result.current.updateContent(id, 'snapshot being saved');
+      result.current.updateContent(id, 'newer edit');
+    });
+    act(() => {
+      result.current.markSaved(id, '/path/saved.md', 'snapshot being saved');
+    });
+    expect(result.current.activeTab?.content).toBe('newer edit');
+    expect(result.current.activeTab?.savedContent).toBe('snapshot being saved');
+    expect(result.current.activeTab?.isDirty).toBe(true);
   });
 
   it('opens content in a new tab or reuses empty tab', () => {

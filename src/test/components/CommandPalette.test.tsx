@@ -71,6 +71,18 @@ describe('CommandPalette', () => {
     expect(onExecute).toHaveBeenCalled();
   });
 
+  it('resets keyboard selection when the query changes', () => {
+    const onExecute = vi.fn();
+    render(<CommandPalette visible={true} commands={SAMPLE_COMMANDS} onClose={vi.fn()} onExecute={onExecute} />);
+    const input = screen.getByPlaceholderText('Type a command...');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.change(input, { target: { value: 'toggle' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onExecute).toHaveBeenCalledWith(SAMPLE_COMMANDS[2]);
+  });
+
   it('shows shortcut hints', () => {
     render(<CommandPalette visible={true} commands={SAMPLE_COMMANDS} onClose={vi.fn()} onExecute={vi.fn()} />);
     expect(screen.getByText('Ctrl+N')).toBeDefined();

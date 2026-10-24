@@ -9,20 +9,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.2.0-2] - 2026-10-24
+
 ### Added
 - Syntax highlighting in the Source editor: highlight.js (core + markdown only) renders a colour-coded layer behind the transparent textarea, using theme CSS variables so every built-in theme works; follows the font size and word-wrap settings
 - Tab drag-and-drop reordering using the native HTML5 drag API; the dragged tab fades and a left accent bar marks the drop target
 - Pre-commit hook (husky) that runs `npm run lint`
 - `npm run check:version` (run in CI and before release builds): versions must match across `package.json`, `tauri.conf.json` and `Cargo.toml`, pre-releases must be numeric so the Windows MSI builds, and the tag must match the version
+- Atomic native saves with flush-before-replace semantics, Windows rollback handling, and external-change conflict detection
+- Deterministic close queues that preserve unsaved tabs when saving is cancelled, fails, or conflicts
+- Versioned, bounded crash-draft recovery after an unclean shutdown
+- Integration and unit coverage for save outcomes, close queues, recovery, context menus, and document outlines
 
 ### Changed
 - Pre-release versions are now numeric (`0.2.0-2` instead of `0.2.0-beta.2`) so the Windows build succeeds and releases include the `.msi` and `.exe`
 - Release workflow marks a release as a pre-release based on its tag (`v0.2.0-2` → pre-release, `v0.2.0` → normal release)
+- Test coverage floors are now 70% for statements and lines, 65% for functions, and 60% for branches
+- Runtime and build dependencies were refreshed; KaTeX and Mermaid moved to their current secure release lines
 
 ### Fixed
 - MD047 (single trailing newline) was a no-op stub; it now flags files that don't end with a newline
 - Find & Replace now shows the error message for an invalid regex instead of silently returning no results
 - Welcome document listed Split View as "Coming"; it has shipped
+- Save and autosave no longer overwrite a file that changed or was deleted outside MDViewer
+- Closing multiple dirty tabs no longer loses queue state after a cancelled or failed save
+
+### Security
+- Dependency refresh removes all critical, high, and moderate findings from the current npm audit; five low-severity findings remain in Milkdown's upstream math-rendering chain
 
 ### Removed
 - Unused `markdownlint` dependency (the linter is a custom engine)
@@ -84,6 +99,7 @@ Initial public release.
 - **Graceful browser fallbacks** for all file operations (open via `<input>`, save via download)
 - **GitHub Actions CI** — automated cross-platform builds (Windows, macOS universal, Linux) on `v*` tag pushes
 
-[Unreleased]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-beta.1...HEAD
+[Unreleased]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-2...HEAD
+[0.2.0-2]: https://github.com/jojo-swe/MDViewer/compare/v0.2.0-beta.1...v0.2.0-2
 [0.2.0-beta.1]: https://github.com/jojo-swe/MDViewer/compare/v0.1.1...v0.2.0-beta.1
 [0.1.0]: https://github.com/jojo-swe/MDViewer/releases/tag/v0.1.0
