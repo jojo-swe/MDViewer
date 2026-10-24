@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { Tab, MakeTabOverrides } from '../types/tab';
+import type { TabSessionState } from '../types/session';
 
 let nextId = 1;
 
@@ -18,9 +19,20 @@ function makeTab(overrides: MakeTabOverrides = {}): Tab {
 /**
  * Multi-document tab state management hook.
  */
-export function useTabs() {
-  const [tabs, setTabs] = useState<Tab[]>(() => [makeTab()]);
-  const [activeId, setActiveId] = useState<number>(() => tabs[0]?.id ?? 1);
+function prepareInitialState(initialState?: TabSessionState | null): TabSessionState {
+  if (initialState?.tabs.length && initialState.tabs.some((tab) => tab.id === initialState.activeId)) {
+    const tabs = initialState.tabs.map((tab) => ({ ...tab }));
+    nextId = Math.max(nextId, ...tabs.map((tab) => tab.id + 1));
+    return { tabs, activeId: initialState.activeId };
+  }
+  const tab = makeTab();
+  return { tabs: [tab], activeId: tab.id };
+}
+
+export function useTabs(restoredState?: TabSessionState | null) {
+  const [initialState] = useState(() => prepareInitialState(restoredState));
+  const [tabs, setTabs] = useState<Tab[]>(initialState.tabs);
+  const [activeId, setActiveId] = useState<number>(initialState.activeId);
 
   const activeTab = tabs.find((t) => t.id === activeId) || tabs[0];
 
@@ -33,28 +45,24 @@ export function useTabs() {
     return tab;
   }, []);
 
-  const closeTab = useCallback(
-    (id: number) => {
-      setTabs((prev) => {
-        if (prev.length === 1) {
-          // Don't close the last tab — reset it instead
-          const newTab = makeTab();
-          setActiveId(newTab.id);
-          return [newTab];
-        }
-        const idx = prev.findIndex((t) => t.id === id);
-        const next = prev.filter((t) => t.id !== id);
+  const closeTabs = useCallback((ids: number[]) => {
+    const targets = new Set(ids);
+    setTabs((prev) => {
+      const firstRemovedIndex = prev.findIndex((tab) => targets.has(tab.id));
+      if (firstRemovedIndex === -1) return prev;
 
-        // If closing the active tab, switch to the nearest remaining tab
-        if (id === activeId) {
-          const newIdx = Math.min(idx, next.length - 1);
-          setActiveId(next[newIdx].id);
-        }
-        return next;
+      let next = prev.filter((tab) => !targets.has(tab.id));
+      if (next.length === 0) next = [makeTab()];
+
+      setActiveId((current) => {
+        if (next.some((tab) => tab.id === current)) return current;
+        return next[Math.min(firstRemovedIndex, next.length - 1)].id;
       });
-    },
-    [activeId]
-  );
+      return next;
+    });
+  }, []);
+
+  const closeTab = useCallback((id: number) => closeTabs([id]), [closeTabs]);
 
   const switchTab = useCallback((id: number) => {
     setActiveId(id);
@@ -82,9 +90,11 @@ export function useTabs() {
           ...t,
           path: path || t.path,
           filename,
-          content,
           savedContent: content,
-          isDirty: false,
+          // A save can finish after the user has typed more. Preserve the
+          // current content and only clear dirty state when that exact snapshot
+          // is still current.
+          isDirty: t.content !== content,
         };
       })
     );
@@ -150,6 +160,7 @@ export function useTabs() {
     activeId,
     createTab,
     closeTab,
+    closeTabs,
     switchTab,
     updateContent,
     markSaved,

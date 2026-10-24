@@ -99,10 +99,15 @@ Real-time document statistics at a glance:
 
 ### 🛡️ Safe Editing
 
-- **Auto-save** — Automatically saves after a configurable idle period
-- **Save before close dialog** — Never lose unsaved work
+- **Auto-save** — Saves the exact document revision that scheduled it after a configurable idle period
+- **Protected desktop writes** — Flushes a sibling temporary file before replacing the destination, with rollback protection on Windows
+- **External-change protection** — Refuses to overwrite files changed or deleted outside MDViewer
+- **Crash recovery** — Restores dirty tabs after an unclean shutdown; normal clean exits do not reopen stale drafts
+- **Safe close queue** — Processes unsaved tabs one at a time for Close, Close All, and window exit
 - **Toast notifications** — Clear feedback on save, open, export, and errors
 - **Recent files** — Quick access to your last 10 documents from the welcome screen
+
+See [Data Safety & Recovery](docs/data-safety.md) for behavior, limits, and recovery details.
 
 ### 📄 PDF Export
 
@@ -223,9 +228,13 @@ MDViewer/
 │   │   ├── useSyncScroll.ts     # Split view scroll sync
 │   │   ├── useOutline.ts        # Heading extraction for TOC
 │   │   ├── useShortcuts.ts      # Configurable keyboard shortcuts
-│   │   └── useContextMenu.ts    # Context menu state management
+│   │   ├── useContextMenu.ts    # Context menu state management
+│   │   └── useSessionRecovery.ts # Bounded crash-draft snapshots
 │   ├── utils/                   # Utilities
 │   │   ├── fileManager.ts       # Tauri/browser file I/O
+│   │   ├── documentManager.ts   # Typed save outcomes and persistence policy
+│   │   ├── closeQueue.ts        # Deterministic dirty-tab close planning
+│   │   ├── sessionManager.ts    # Versioned recovery snapshots
 │   │   ├── linter.ts            # Lint rules engine
 │   │   ├── pdfExport.ts         # Print-to-PDF export
 │   │   ├── highlight.ts         # Shiki syntax highlighting
@@ -237,7 +246,7 @@ MDViewer/
 │   ├── commands/                # Command registry
 │   │   └── registry.ts          # 20+ commands with shortcuts
 │   ├── types/                   # TypeScript type definitions
-│   └── test/                    # 214 tests across 27 files
+│   └── test/                    # 247 tests across 34 files
 ├── src-tauri/                   # Tauri (Rust) backend
 └── .github/workflows/           # CI/CD release pipeline
 ```
@@ -258,6 +267,11 @@ npm run test:run
 
 # Run tests with coverage
 npm run test:coverage
+
+# Rust tests and linting
+cd src-tauri
+cargo test
+cargo clippy -- -D warnings
 ```
 
 ---

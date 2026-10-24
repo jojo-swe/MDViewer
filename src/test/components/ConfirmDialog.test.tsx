@@ -62,4 +62,14 @@ describe('ConfirmDialog', () => {
     expect(screen.getByText('No')).toBeDefined();
     expect(screen.getByText('Back')).toBeDefined();
   });
+
+  it('disables every decision while a save is in progress', () => {
+    render(
+      <ConfirmDialog visible={true} busy={true} onConfirm={vi.fn()} onDanger={vi.fn()} onCancel={vi.fn()} />
+    );
+
+    expect((screen.getByText('Save') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText("Don't Save") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText('Cancel') as HTMLButtonElement).disabled).toBe(true);
+  });
 });

@@ -1,5 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { invoke } from '@tauri-apps/api/core';
 import { getFileName, isDesktopApp, openFile, saveFile, saveFileAs } from '../../utils/fileManager';
+
+function mockBrowserDownload() {
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: vi.fn().mockReturnValue('blob:test'),
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    value: vi.fn(),
+  });
+}
 
 describe('fileManager', () => {
   describe('getFileName', () => {
@@ -37,22 +49,63 @@ describe('fileManager', () => {
 
   describe('openFile', () => {
     it('returns null when dialog returns null', async () => {
+      const createElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+        const element = createElement(tagName, options);
+        if (tagName === 'input') {
+          vi.spyOn(element, 'click').mockImplementation(() => {
+            element.dispatchEvent(new Event('change'));
+          });
+        }
+        return element;
+      });
       const result = await openFile();
       expect(result).toBeNull();
     });
   });
 
   describe('saveFile', () => {
-    it('returns null when no path provided (delegates to saveFileAs)', async () => {
-      const result = await saveFile(null, 'content');
-      expect(result).toBeNull();
+    it('uses a browser download when not running in Tauri', async () => {
+      mockBrowserDownload();
+      const result = await saveFile('uploaded.md', 'content', 'original');
+      expect(result).toEqual({ status: 'saved', path: 'untitled.md' });
+    });
+
+    it('uses the protected Tauri command for an existing desktop file', async () => {
+      Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: {} });
+      vi.mocked(invoke).mockResolvedValue({ status: 'saved' });
+
+      const result = await saveFile('C:\\docs\\test.md', 'content', 'original');
+
+      expect(invoke).toHaveBeenCalledWith('atomic_write_text_file', {
+        path: 'C:\\docs\\test.md',
+        content: 'content',
+        expectedContent: 'original',
+      });
+      expect(result).toEqual({ status: 'saved', path: 'C:\\docs\\test.md' });
+      delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    });
+
+    it('passes through external file conflicts from the protected writer', async () => {
+      Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: {} });
+      vi.mocked(invoke).mockResolvedValue({
+        status: 'conflict',
+        reason: 'changed',
+        diskContent: 'external',
+      });
+
+      const result = await saveFile('C:\\docs\\test.md', 'mine', 'original');
+
+      expect(result).toEqual({ status: 'conflict', reason: 'changed', diskContent: 'external' });
+      delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
     });
   });
 
   describe('saveFileAs', () => {
-    it('returns null when dialog returns null', async () => {
+    it('downloads a new file in the browser', async () => {
+      mockBrowserDownload();
       const result = await saveFileAs('content');
-      expect(result).toBeNull();
+      expect(result).toBe('untitled.md');
     });
   });
 });

@@ -105,4 +105,22 @@ describe('useAutoSave', () => {
 
     expect(onSave).not.toHaveBeenCalled();
   });
+
+  it('cancels the old timer when the active tab changes', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const first = makeTab({ id: 1, path: '/first.md', isDirty: true });
+    const second = makeTab({ id: 2, path: '/second.md', isDirty: true });
+
+    const { rerender } = renderHook(
+      ({ activeTab }) => useAutoSave(activeTab, { enabled: true, interval: 1000 }, { onSave }),
+      { initialProps: { activeTab: first } }
+    );
+
+    act(() => { vi.advanceTimersByTime(500); });
+    rerender({ activeTab: second });
+    await act(async () => { vi.advanceTimersByTime(1000); });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith(second);
+  });
 });

@@ -1,4 +1,4 @@
-import type { OpenFileResult } from '../types/file';
+import type { ExistingFileWriteResult, OpenFileResult } from '../types/file';
 
 /**
  * File management utilities for Tauri.
@@ -11,6 +11,7 @@ let tauriFs: typeof import('@tauri-apps/plugin-fs') | null = null;
 
 // Dynamically import Tauri modules (only available in the desktop app)
 async function ensureTauri(): Promise<boolean> {
+  if (!isDesktopApp()) return false;
   if (tauriDialog && tauriFs) return true;
   try {
     tauriDialog = await import('@tauri-apps/plugin-dialog');
@@ -65,16 +66,27 @@ export async function openFile(): Promise<OpenFileResult | null> {
  * @param {string} path - The file path to save to
  * @param {string} content - The markdown content
  */
-export async function saveFile(path: string | null, content: string): Promise<string | null> {
-  const hasTauri = await ensureTauri();
-
-  if (hasTauri && tauriFs && path) {
-    await tauriFs.writeTextFile(path, content);
-    return path;
+export async function saveFile(
+  path: string,
+  content: string,
+  expectedContent: string
+): Promise<ExistingFileWriteResult> {
+  if (isDesktopApp() && path) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const result = await invoke<
+      { status: 'saved' } | Extract<ExistingFileWriteResult, { status: 'conflict' }>
+    >('atomic_write_text_file', {
+      path,
+      content,
+      expectedContent,
+    });
+    return result.status === 'saved' ? { status: 'saved', path } : result;
   }
 
   // Web fallback: trigger download
-  return saveFileAs(content);
+  const savedPath = await saveFileAs(content);
+  if (!savedPath) throw new Error('Browser download was cancelled');
+  return { status: 'saved', path: savedPath };
 }
 
 /**
@@ -97,7 +109,8 @@ export async function saveFileAs(content: string): Promise<string | null> {
 
     if (!filePath) return null;
 
-    await tauriFs.writeTextFile(filePath, content);
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('atomic_write_text_file', { path: filePath, content });
     return filePath;
   }
 

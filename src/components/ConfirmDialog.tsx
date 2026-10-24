@@ -12,6 +12,7 @@ interface ConfirmDialogProps {
   onConfirm?: () => void;
   onDanger?: () => void;
   onCancel?: () => void;
+  busy?: boolean;
 }
 
 /**
@@ -27,6 +28,7 @@ export default function ConfirmDialog({
   onConfirm,
   onDanger,
   onCancel,
+  busy = false,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -70,13 +72,13 @@ export default function ConfirmDialog({
         </div>
         <p className="confirm-message">{message}</p>
         <div className="confirm-actions">
-          <button className="confirm-btn confirm-btn--ghost" onClick={onCancel}>
+          <button className="confirm-btn confirm-btn--ghost" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </button>
-          <button className="confirm-btn confirm-btn--danger" onClick={onDanger}>
+          <button className="confirm-btn confirm-btn--danger" onClick={onDanger} disabled={busy}>
             {dangerLabel}
           </button>
-          <button className="confirm-btn confirm-btn--primary" onClick={onConfirm}>
+          <button className="confirm-btn confirm-btn--primary" onClick={onConfirm} disabled={busy}>
             {confirmLabel}
           </button>
         </div>
