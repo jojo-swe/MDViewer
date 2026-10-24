@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { savePastedImage, isImageFile, isImageClipboardItem } from '../../utils/imageManager';
+import { invoke } from '@tauri-apps/api/core';
+import {
+  MAX_PASTED_IMAGE_BYTES,
+  savePastedImage,
+  isImageFile,
+  isImageClipboardItem,
+} from '../../utils/imageManager';
 
 describe('imageManager', () => {
   beforeEach(() => {
@@ -30,6 +36,43 @@ describe('imageManager', () => {
       const blob = new Blob(['data'], { type: 'image/unknown' });
       const result = await savePastedImage(blob, null);
       expect(result).toMatch(/^blob:/);
+    });
+
+    it('delegates persistent image writes to the scoped native command', async () => {
+      Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: {} });
+      vi.mocked(invoke).mockResolvedValue('images/image-1.png');
+      const blob = new Blob(['data'], { type: 'image/png' });
+
+      const result = await savePastedImage(blob, 'C:\\docs\\draft.md');
+
+      expect(result).toBe('images/image-1.png');
+      expect(invoke).toHaveBeenCalledWith('save_pasted_image', expect.objectContaining({
+        documentPath: 'C:\\docs\\draft.md',
+        extension: 'png',
+      }));
+      delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    });
+
+    it('does not hide a failed desktop write behind a transient blob URL', async () => {
+      Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: {} });
+      vi.mocked(invoke).mockRejectedValue(new Error('path denied'));
+
+      await expect(savePastedImage(
+        new Blob(['data'], { type: 'image/png' }),
+        'C:\\docs\\draft.md'
+      )).rejects.toThrow('path denied');
+
+      delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    });
+
+    it('rejects oversized images before reading or serializing the blob', async () => {
+      const blob = new Blob(['small'], { type: 'image/png' });
+      Object.defineProperty(blob, 'size', { value: MAX_PASTED_IMAGE_BYTES + 1 });
+      const arrayBuffer = vi.spyOn(blob, 'arrayBuffer');
+
+      await expect(savePastedImage(blob, 'C:\\docs\\draft.md')).rejects.toThrow('10 MiB limit');
+      expect(arrayBuffer).not.toHaveBeenCalled();
+      expect(invoke).not.toHaveBeenCalled();
     });
   });
 

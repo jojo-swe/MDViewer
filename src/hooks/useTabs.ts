@@ -101,15 +101,20 @@ export function useTabs(restoredState?: TabSessionState | null) {
   }, []);
 
   const openInTab = useCallback(
-    (path: string | null, content: string): Tab | undefined => {
+    (
+      path: string | null,
+      content: string,
+      displayName?: string,
+      treatAsUnsaved = false
+    ): Tab | undefined => {
       // Check if file is already open
-      const existing = tabs.find((t) => t.path === path);
+      const existing = path ? tabs.find((t) => t.path === path) : undefined;
       if (existing) {
         setActiveId(existing.id);
         return existing;
       }
 
-      const filename = path ? path.split(/[\\/]/).pop() || 'Untitled' : 'Untitled';
+      const filename = displayName || (path ? path.split(/[\\/]/).pop() || 'Untitled' : 'Untitled');
 
       // If only one tab exists and it's untouched, reuse it
       if (tabs.length === 1 && !tabs[0].isDirty && !tabs[0].path && tabs[0].content === '') {
@@ -120,15 +125,21 @@ export function useTabs(restoredState?: TabSessionState | null) {
             path,
             filename,
             content,
-            savedContent: content,
-            isDirty: false,
+            savedContent: treatAsUnsaved ? '' : content,
+            isDirty: treatAsUnsaved && content !== '',
           },
         ]);
         setActiveId(reusedId);
         return tabs[0];
       }
 
-      return createTab({ path, filename, content, savedContent: content });
+      return createTab({
+        path,
+        filename,
+        content,
+        savedContent: treatAsUnsaved ? '' : content,
+        isDirty: treatAsUnsaved && content !== '',
+      });
     },
     [tabs, createTab]
   );

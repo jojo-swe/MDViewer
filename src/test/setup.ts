@@ -27,6 +27,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readTextFile: vi.fn().mockResolvedValue(''),
+  stat: vi.fn().mockResolvedValue({ size: 0, isFile: true, isDirectory: false, isSymlink: false }),
   writeTextFile: vi.fn().mockResolvedValue(undefined),
   exists: vi.fn().mockResolvedValue(false),
   removeFile: vi.fn().mockResolvedValue(undefined),

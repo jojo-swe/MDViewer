@@ -10,49 +10,8 @@ import { renderMermaid } from '../utils/mermaidRenderer';
 import { savePastedImage, isImageClipboardItem } from '../utils/imageManager';
 import { getThemeConfig } from '../themes';
 
-const DEFAULT_CONTENT = `# Welcome to MDViewer
-
-A powerful, lightweight, and beautifully crafted Markdown editor.
-
-## Getting Started
-
-Start typing to begin writing your document. MDViewer supports **bold**, *italic*, ~~strikethrough~~, and \`inline code\`.
-
-### Features
-
-- **WYSIWYG Editing** — What you see is what you get
-- **Slash Commands** — Type \`/\` to insert blocks quickly
-- **Markdown Linting** — Configurable strictness levels
-- **Dark & Light Mode** — Seamless theme switching
-- **Code Blocks** — Syntax highlighted code editing
-- **Tables** — Full-featured table editing
-- **LaTeX** — Mathematical formula support
-
-### Code Example
-
-\`\`\`javascript
-function greet(name) {
-  return \`Hello, \${name}! Welcome to MDViewer.\`;
-}
-
-console.log(greet("World"));
-\`\`\`
-
-### A Table
-
-| Feature | Status |
-|---------|--------|
-| WYSIWYG | ✅ Ready |
-| Linting | ✅ Ready |
-| Dark Mode | ✅ Ready |
-| Split View | ✅ Ready |
-
-> **Tip:** Use the toolbar at the bottom to toggle linting, switch themes, or check your word count.
-
----
-
-*Happy writing!* ✨
-`;
+const MAX_ENHANCED_CODE_BLOCKS = 50;
+const MAX_ENHANCED_CODE_BLOCK_CHARACTERS = 100_000;
 
 export interface EditorInstance {
   getMarkdown: () => string;
@@ -67,9 +26,10 @@ interface MilkdownEditorProps {
   fontSize?: number;
   wordWrap?: boolean;
   basePath?: string | null;
+  onImageError?: (message: string) => void;
 }
 
-export default function MilkdownEditor({ theme, onMarkdownChange, externalContent, editorInstanceRef, fontSize, wordWrap, basePath = null }: MilkdownEditorProps) {
+export default function MilkdownEditor({ theme, onMarkdownChange, externalContent, editorInstanceRef, fontSize, wordWrap, basePath = null, onImageError }: MilkdownEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
   const initEditorRef = useRef<((content: string) => Crepe | void) | null>(null);
@@ -84,11 +44,13 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
   // --- Shiki syntax highlighting + Mermaid rendering for code blocks ---
   const highlightCodeBlocks = useCallback(async () => {
     if (!editorRef.current) return;
-    const codeBlocks = editorRef.current.querySelectorAll<HTMLElement>('pre code');
+    const codeBlocks = Array.from(
+      editorRef.current.querySelectorAll<HTMLElement>('pre code')
+    ).slice(0, MAX_ENHANCED_CODE_BLOCKS);
     if (codeBlocks.length === 0) return;
 
     const currentTheme = getThemeConfig(themeRef.current).isDark ? 'dark' : 'light';
-    const promises = Array.from(codeBlocks).map(async (block, index) => {
+    const promises = codeBlocks.map(async (block, index) => {
       // Skip if already highlighted by Shiki or rendered as Mermaid
       if (block.closest('.shiki') || block.closest('.mermaid-svg')) return;
 
@@ -99,6 +61,7 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
       const langClass = Array.from(block.classList).find((c) => c.startsWith('language-'));
       const lang = langClass ? langClass.replace('language-', '') : 'markdown';
       const code = block.textContent || '';
+      if (code.length > MAX_ENHANCED_CODE_BLOCK_CHARACTERS) return;
 
       // Handle Mermaid diagrams
       if (lang === 'mermaid') {
@@ -181,9 +144,6 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
           },
         };
       }
-      if (onMarkdownChange) {
-        onMarkdownChange(content);
-      }
       // Trigger initial syntax highlighting
       highlightCodeBlocksRef.current();
     });
@@ -198,11 +158,14 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
 
   // Initialize editor on mount
   useEffect(() => {
-    initEditor(DEFAULT_CONTENT);
+    initEditor(externalContent ?? '');
     return () => {
       if (crepeRef.current) {
         crepeRef.current.destroy();
         crepeRef.current = null;
+      }
+      if (editorInstanceRef) {
+        editorInstanceRef.current = null;
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -210,6 +173,7 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
   // Handle external content updates (file open)
   useEffect(() => {
     if (externalContent !== null && externalContent !== undefined && crepeRef.current) {
+      if (crepeRef.current.getMarkdown() === externalContent) return;
       crepeRef.current.destroy();
       crepeRef.current = null;
       initEditor(externalContent);
@@ -284,14 +248,14 @@ export default function MilkdownEditor({ theme, onMarkdownChange, externalConten
         const imgMarkdown = `![image](${path})`;
         // Insert at cursor by using execCommand as fallback
         document.execCommand('insertText', false, imgMarkdown);
-      } catch {
-        // Silently skip if image paste fails
+      } catch (error) {
+        onImageError?.((error as Error).message);
       }
     };
 
     editorEl.addEventListener('paste', handlePaste);
     return () => editorEl.removeEventListener('paste', handlePaste);
-  }, [basePath]);
+  }, [basePath, onImageError]);
 
   return (
     <div

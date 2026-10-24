@@ -1,21 +1,35 @@
+import { isDesktopApp } from './fileManager';
+
+const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/bmp': 'bmp',
+};
+
+export const MAX_PASTED_IMAGE_BYTES = 10 * 1024 * 1024;
+
 export async function savePastedImage(
   blob: Blob,
-  basePath: string | null
+  documentPath: string | null
 ): Promise<string> {
-  const ext = blob.type.split('/')[1] || 'png';
-  const filename = `image-${Date.now()}.${ext}`;
+  const extension = IMAGE_EXTENSION_BY_MIME[blob.type] || 'png';
 
-  if (basePath) {
+  if (blob.size > MAX_PASTED_IMAGE_BYTES) {
+    throw new Error('The pasted image exceeds the 10 MiB limit');
+  }
+
+  if (documentPath && isDesktopApp()) {
     try {
-      const { mkdir, writeFile } = await import('@tauri-apps/plugin-fs');
-      const { join } = await import('@tauri-apps/api/path');
-      const imagesDir = await join(basePath, 'images');
-      await mkdir(imagesDir, { recursive: true });
-      const fullPath = await join(imagesDir, filename);
-      await writeFile(fullPath, new Uint8Array(await blob.arrayBuffer()));
-      return `images/${filename}`;
-    } catch {
-      // Fall through to blob URL
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke<string>('save_pasted_image', {
+        documentPath,
+        bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
+        extension,
+      });
+    } catch (error) {
+      throw new Error(`Could not save pasted image: ${(error as Error).message}`);
     }
   }
 

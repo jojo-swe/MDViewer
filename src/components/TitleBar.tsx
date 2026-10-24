@@ -47,7 +47,7 @@ export default function TitleBar({ filename, isDirty }: TitleBarProps) {
     try { appWindow.toggleMaximize(); } catch (error) { void error; }
   };
   const handleClose = () => {
-    appWindow.destroy().catch((error) => {
+    appWindow.close().catch((error) => {
       void error;
     });
   };

@@ -10,7 +10,7 @@ MDViewer is a cross-platform WYSIWYG Markdown editor built with **React 19 + Typ
 - TypeScript in `strict` mode (`noUnusedLocals`, `noUnusedParameters`); shared types live in `src/types/`
 - Plain CSS with custom properties — no preprocessors, no CSS-in-JS
 - No state-management library — state lives in custom hooks composed in `App.tsx`
-- The Rust backend has no custom commands; all native access is through Tauri plugins
+- The Rust backend owns bounded document reads, scoped atomic document writes, and persistent pasted-image writes; dialogs, settings, directory browsing, and window controls use Tauri plugins
 
 ---
 
@@ -117,17 +117,18 @@ Custom rule engine (no `markdownlint` dependency). Each rule in `RULES` has a `l
 
 ### Adding a native capability
 
-1. Add the plugin to `src-tauri/Cargo.toml`
-2. Register it in `src-tauri/src/lib.rs`
-3. Grant permissions in `src-tauri/capabilities/default.json`
-4. Import it dynamically from `src/utils/` with a browser fallback, and mock it in `src/test/setup.ts`
+1. Prefer an existing Tauri plugin and add it to `src-tauri/Cargo.toml` when needed.
+2. Register plugins or narrowly scoped custom commands in `src-tauri/src/lib.rs`.
+3. Grant the minimum permissions in `src-tauri/capabilities/default.json`.
+4. Validate dialog-approved paths again in native commands that write to disk.
+5. Import the API dynamically from `src/utils/` with a browser fallback, and mock it in `src/test/setup.ts`.
 
 ---
 
 ## Release / CI
 
 - **`ci.yml`** — on pushes and PRs to `main`: version check → lint → typecheck → test with coverage → build.
-- **`release.yml`** — on `v*` tags: builds installers on Ubuntu (`.deb`, `.AppImage`, `.rpm`), Windows (`.msi`, NSIS `.exe`; `bundle.targets: "all"`) and macOS (universal `.dmg`), and publishes the GitHub release immediately. Tags with a pre-release part (`v0.2.0-2`) are marked as pre-releases; plain `vX.Y.Z` tags are normal releases.
+- **`release.yml`** — on `v*` tags: runs the full release quality gate, then builds Ubuntu (`.deb`, `.AppImage`), Windows (`.msi`, NSIS `.exe`) and macOS (universal `.dmg`) bundles. Numeric pre-release tags such as `v0.4.0-1` are published as pre-releases. Plain stable tags are deliberately rejected until signing, notarization, and clean-machine acceptance are configured.
 
 ### Versioning rules (enforced by `npm run check:version`)
 

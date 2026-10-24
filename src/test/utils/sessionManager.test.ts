@@ -25,6 +25,7 @@ function memoryStorage(initial: Record<string, string> = {}) {
   return {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
     value: (key: string) => values.get(key),
   };
 }
@@ -49,6 +50,7 @@ describe('sessionManager', () => {
 
     expect(loadRecoverySession(cleanExit).state).toBeNull();
     expect(loadRecoverySession(noDirtyWork).state).toBeNull();
+    expect(cleanExit.value(SESSION_STORAGE_KEY)).toBeUndefined();
   });
 
   it('rejects corrupt, unsupported, duplicate, and invalid snapshots', () => {
@@ -89,7 +91,59 @@ describe('sessionManager', () => {
     const storage = {
       getItem: () => null,
       setItem: () => { throw new Error('quota exceeded'); },
+      removeItem: () => { throw new Error('unavailable'); },
     };
     expect(persistSession({ tabs: [tab()], activeId: 1 }, false, storage)).toBe(false);
+  });
+
+  it('prioritizes dirty and active tabs beyond the first fifty tabs', () => {
+    const cleanTabs = Array.from({ length: 55 }, (_, index) => tab({
+      id: index + 1,
+      filename: `clean-${index + 1}.md`,
+      content: 'saved',
+      savedContent: 'saved',
+      isDirty: false,
+    }));
+    cleanTabs[54] = tab({ id: 55, filename: 'important.md', content: 'unsaved', isDirty: true });
+
+    const snapshot = createSessionSnapshot(cleanTabs, 55, false);
+
+    expect(snapshot.tabs.some((candidate) => candidate.id === 55)).toBe(true);
+    expect(snapshot.activeId).toBe(55);
+    expect(snapshot.incomplete).toBe(true);
+  });
+
+  it('retries quota failures by dropping lower-priority tabs', () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        const snapshot = JSON.parse(value) as { tabs: Tab[] };
+        if (snapshot.tabs.length > 1) throw new Error('quota exceeded');
+        values.set(key, value);
+      },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+    const important = tab({ id: 1, content: 'unsaved', isDirty: true });
+    const clean = tab({ id: 2, content: 'saved', savedContent: 'saved', isDirty: false });
+
+    expect(persistSession({ tabs: [important, clean], activeId: 1 }, false, storage)).toBe(false);
+    expect(loadRecoverySession(storage).state?.tabs).toEqual([important]);
+  });
+
+  it('keeps inactive dirty work ahead of a large active clean tab', () => {
+    const activeClean = tab({
+      id: 1,
+      content: 'x'.repeat(MAX_RECOVERY_CHARACTERS),
+      savedContent: 'x'.repeat(MAX_RECOVERY_CHARACTERS),
+      isDirty: false,
+    });
+    const inactiveDirty = tab({ id: 2, content: 'unsaved draft', isDirty: true });
+
+    const snapshot = createSessionSnapshot([activeClean, inactiveDirty], 1, false);
+
+    expect(snapshot.tabs).toEqual([inactiveDirty]);
+    expect(snapshot.activeId).toBe(2);
+    expect(snapshot.incomplete).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSessionRecovery } from '../../hooks/useSessionRecovery';
+import * as sessionManager from '../../utils/sessionManager';
 import { loadRecoverySession, SESSION_STORAGE_KEY } from '../../utils/sessionManager';
 import type { Tab } from '../../types/tab';
 
@@ -30,6 +31,32 @@ describe('useSessionRecovery', () => {
 
     act(() => result.current.markCleanExit());
     expect(loadRecoverySession().state).toBeNull();
-    expect(JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!).cleanExit).toBe(true);
+    expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it('reports a recovery persistence failure once until storage succeeds again', () => {
+    const onFailure = vi.fn();
+    const persistSession = vi.spyOn(sessionManager, 'persistSession').mockReturnValue(false);
+    const { rerender } = renderHook(
+      ({ tabs }) => useSessionRecovery(tabs, tabs[0].id, onFailure),
+      { initialProps: { tabs: [draft] } }
+    );
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(onFailure).toHaveBeenCalledTimes(1);
+
+    rerender({ tabs: [{ ...draft, content: 'newer' }] });
+    act(() => vi.advanceTimersByTime(300));
+    expect(onFailure).toHaveBeenCalledTimes(1);
+
+    persistSession.mockReturnValue(true);
+    rerender({ tabs: [{ ...draft, content: 'recovered' }] });
+    act(() => vi.advanceTimersByTime(300));
+    expect(onFailure).toHaveBeenCalledTimes(1);
+
+    persistSession.mockReturnValue(false);
+    rerender({ tabs: [{ ...draft, content: 'failed again' }] });
+    act(() => vi.advanceTimersByTime(300));
+    expect(onFailure).toHaveBeenCalledTimes(2);
   });
 });

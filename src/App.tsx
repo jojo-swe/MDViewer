@@ -23,7 +23,7 @@ import { useOutline } from './hooks/useOutline';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useContextMenu, type ContextMenuItem } from './hooks/useContextMenu';
 import { useSessionRecovery } from './hooks/useSessionRecovery';
-import { openFile, getFileName, isDesktopApp } from './utils/fileManager';
+import { openFile, getFileName, isDesktopApp, readBrowserTextFile, readTextFile } from './utils/fileManager';
 import { saveDocument } from './utils/documentManager';
 import { advanceTabClose, planTabClose } from './utils/closeQueue';
 import { loadRecoverySession } from './utils/sessionManager';
@@ -76,7 +76,14 @@ function App() {
 
   const toast = useToast();
   const showWarningToast = toast.warning;
-  const { markCleanExit } = useSessionRecovery(tabs, activeId);
+  const showErrorToast = toast.error;
+  const handleRecoveryFailure = useCallback(() => {
+    showWarningToast('Crash recovery could not store every unsaved document. Save important work now.');
+  }, [showWarningToast]);
+  const handleImageError = useCallback((message: string) => {
+    showErrorToast(message);
+  }, [showErrorToast]);
+  const { markCleanExit } = useSessionRecovery(tabs, activeId, handleRecoveryFailure);
   const recoveryNotifiedRef = useRef(false);
 
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -180,15 +187,11 @@ function App() {
   const handleOpenRecent = useCallback(
     async (path: string) => {
       try {
-        let tauriFs: typeof import('@tauri-apps/plugin-fs') | undefined;
-        try { tauriFs = await import('@tauri-apps/plugin-fs'); } catch { /* browser */ }
-        if (tauriFs) {
-          const content = await tauriFs.readTextFile(path);
-          openInTab(path, content);
-          addRecentFile(path, getFileName(path));
-          setShowWelcome(false);
-          toast.success(`Opened ${getFileName(path)}`);
-        }
+        const content = await readTextFile(path);
+        openInTab(path, content);
+        addRecentFile(path, getFileName(path));
+        setShowWelcome(false);
+        toast.success(`Opened ${getFileName(path)}`);
       } catch (err) {
         toast.error(`Failed to open: ${(err as Error).message}`);
       }
@@ -220,14 +223,12 @@ function App() {
 
   const handleSave = useCallback(async () => {
     if (!activeTab) return;
-    const currentContent = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
-    await persistTab(activeTab, currentContent);
+    await persistTab(activeTab, activeTab.content);
   }, [activeTab, persistTab]);
 
   const handleSaveAs = useCallback(async () => {
     if (!activeTab) return;
-    const currentContent = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
-    await persistTab(activeTab, currentContent, { forceSaveAs: true });
+    await persistTab(activeTab, activeTab.content, { forceSaveAs: true });
   }, [activeTab, persistTab]);
 
   const handleExportPDF = useCallback(() => {
@@ -352,7 +353,7 @@ function App() {
   const handleReplace = useCallback(
     (transformFn: (markdown: string) => string) => {
       if (!activeTab) return;
-      const currentMarkdown = editorInstanceRef.current?.getMarkdown?.() || activeTab.content;
+      const currentMarkdown = activeTab.content;
       const newMarkdown = transformFn(currentMarkdown);
       if (newMarkdown !== currentMarkdown) {
         updateContent(activeTab.id, newMarkdown);
@@ -443,10 +444,17 @@ function App() {
       const files = Array.from(e.dataTransfer?.files || []);
       for (const file of files) {
         if (/\.(md|markdown|mdown|mkd|mdx|txt)$/i.test(file.name)) {
-          const content = await file.text();
-          openInTab(file.name, content);
-          setShowWelcome(false);
-          toast.success(`Opened ${file.name}`);
+          try {
+            const content = await readBrowserTextFile(file);
+            const desktopCopy = isDesktopApp();
+            openInTab(desktopCopy ? null : file.name, content, file.name, desktopCopy);
+            setShowWelcome(false);
+            toast.success(desktopCopy
+              ? `Opened ${file.name} as an unsaved copy. Use Save As to choose its destination.`
+              : `Opened ${file.name}`);
+          } catch (error) {
+            toast.error(`Failed to open ${file.name}: ${(error as Error).message}`);
+          }
         }
       }
     };
@@ -546,6 +554,7 @@ function App() {
                 fontSize={settings.fontSize}
                 wordWrap={settings.wordWrap}
                 basePath={activeTab?.path ?? null}
+                onImageError={handleImageError}
               />
             </div>
           </div>
@@ -563,6 +572,7 @@ function App() {
             fontSize={settings.fontSize}
             wordWrap={settings.wordWrap}
             basePath={activeTab?.path ?? null}
+            onImageError={handleImageError}
           />
         );
     }

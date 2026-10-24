@@ -8,6 +8,24 @@ import type { ExistingFileWriteResult, OpenFileResult } from '../types/file';
 
 let tauriDialog: typeof import('@tauri-apps/plugin-dialog') | null = null;
 let tauriFs: typeof import('@tauri-apps/plugin-fs') | null = null;
+export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+
+function assertDocumentSize(size: number, name: string): void {
+  if (size > MAX_DOCUMENT_BYTES) {
+    throw new Error(`${name} is larger than the supported 5 MiB document limit`);
+  }
+}
+
+export async function readBrowserTextFile(file: File): Promise<string> {
+  assertDocumentSize(file.size, file.name);
+  return file.text();
+}
+
+export async function readTextFile(path: string): Promise<string> {
+  if (!isDesktopApp()) throw new Error('Native file access is unavailable');
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<string>('read_bounded_text_file', { path });
+}
 
 // Dynamically import Tauri modules (only available in the desktop app)
 async function ensureTauri(): Promise<boolean> {
@@ -42,20 +60,24 @@ export async function openFile(): Promise<OpenFileResult | null> {
 
     if (!filePath) return null;
 
-    const content = await tauriFs.readTextFile(filePath as string);
+    const content = await readTextFile(filePath as string);
     return { path: filePath as string, content };
   }
 
   // Web fallback: use the File System Access API or <input>
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.md,.markdown,.mdown,.mkd,.mdx,.txt';
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return resolve(null);
-      const content = await file.text();
-      resolve({ path: file.name, content });
+      try {
+        const content = await readBrowserTextFile(file);
+        resolve({ path: file.name, content });
+      } catch (error) {
+        reject(error);
+      }
     };
     input.click();
   });

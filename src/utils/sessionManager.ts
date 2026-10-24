@@ -4,10 +4,12 @@ import type { Tab } from '../types/tab';
 export const SESSION_STORAGE_KEY = 'mdviewer-recovery-session';
 export const MAX_RECOVERY_TABS = 50;
 export const MAX_RECOVERY_CHARACTERS = 5_000_000;
+const MAX_RECOVERY_SERIALIZED_CHARACTERS = 4_500_000;
 
 interface SessionStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 function isTab(value: unknown): value is Tab {
@@ -24,21 +26,26 @@ function isTab(value: unknown): value is Tab {
 }
 
 function tabSize(tab: Tab): number {
-  return tab.content.length + tab.savedContent.length + tab.filename.length + (tab.path?.length ?? 0);
+  return JSON.stringify(tab).length;
 }
 
 function selectBoundedTabs(tabs: Tab[], activeId: number): { tabs: Tab[]; incomplete: boolean } {
-  const indexed = tabs.slice(0, MAX_RECOVERY_TABS).map((tab, index) => ({ tab, index }));
+  const indexed = tabs.map((tab, index) => ({ tab, index }));
   const prioritized = [...indexed].sort((left, right) => {
-    const priority = (tab: Tab) => tab.id === activeId ? 0 : tab.isDirty ? 1 : 2;
-    return priority(left.tab) - priority(right.tab) || left.index - right.index;
+    const priority = (tab: Tab) => [tab.isDirty ? 0 : 1, tab.id === activeId ? 0 : 1];
+    const leftPriority = priority(left.tab);
+    const rightPriority = priority(right.tab);
+    return leftPriority[0] - rightPriority[0]
+      || leftPriority[1] - rightPriority[1]
+      || left.index - right.index;
   });
 
   let characters = 0;
   const selected = new Set<number>();
   for (const { tab } of prioritized) {
+    if (selected.size >= MAX_RECOVERY_TABS) break;
     const size = tabSize(tab);
-    if (characters + size > MAX_RECOVERY_CHARACTERS) continue;
+    if (characters + size > MAX_RECOVERY_SERIALIZED_CHARACTERS) continue;
     characters += size;
     selected.add(tab.id);
   }
@@ -47,6 +54,26 @@ function selectBoundedTabs(tabs: Tab[], activeId: number): { tabs: Tab[]; incomp
   return {
     tabs: bounded,
     incomplete: bounded.length !== tabs.length,
+  };
+}
+
+function dropLeastImportantTab(snapshot: SessionSnapshot): SessionSnapshot | null {
+  if (snapshot.tabs.length <= 1) return null;
+  const priority = (tab: Tab) => (tab.isDirty ? 0 : 2) + (tab.id === snapshot.activeId ? 0 : 1);
+  let dropIndex = 0;
+  for (let index = 1; index < snapshot.tabs.length; index += 1) {
+    if (priority(snapshot.tabs[index]) >= priority(snapshot.tabs[dropIndex])) {
+      dropIndex = index;
+    }
+  }
+  const tabs = snapshot.tabs.filter((_, index) => index !== dropIndex);
+  return {
+    ...snapshot,
+    tabs,
+    activeId: tabs.some((tab) => tab.id === snapshot.activeId)
+      ? snapshot.activeId
+      : tabs[0]?.id ?? 0,
+    incomplete: true,
   };
 }
 
@@ -76,10 +103,27 @@ export function persistSession(
   cleanExit: boolean,
   storage: SessionStorage = localStorage
 ): boolean {
+  if (cleanExit) {
+    try {
+      storage.removeItem(SESSION_STORAGE_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  let snapshot = createSessionSnapshot(state.tabs, state.activeId, false);
   try {
-    const snapshot = createSessionSnapshot(state.tabs, state.activeId, cleanExit);
-    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
-    return true;
+    while (true) {
+      try {
+        storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
+        return !snapshot.incomplete;
+      } catch {
+        const reduced = dropLeastImportantTab(snapshot);
+        if (!reduced) return false;
+        snapshot = reduced;
+      }
+    }
   } catch {
     return false;
   }
