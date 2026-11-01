@@ -27,3 +27,15 @@ src-tauri/gen/
 *.njsproj
 *.sln
 *.sw?
+
+# privacy-guard: local secrets, logs, and editor state
+.env
+.env.*
+!.env.example
+logs/
+*.local.*
+.vscode/settings.json
+.idea/
+*.pem
+*.key
+secrets/
