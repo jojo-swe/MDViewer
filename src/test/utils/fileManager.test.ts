@@ -29,7 +29,7 @@ describe('fileManager', () => {
     });
 
     it('extracts filename from windows path', () => {
-      expect(getFileName('C:\\Users\\docs\\readme.md')).toBe('readme.md');
+      expect(getFileName('C:\\Users\\<user>\\readme.md')).toBe('readme.md');
     });
 
     it('extracts filename from bare filename', () => {
