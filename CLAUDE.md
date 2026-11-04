@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # CLAUDE.md — MDViewer
 
 Guidance for AI assistants working on the MDViewer codebase.
