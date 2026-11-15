@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/assets/logo.svg" alt="MDViewer logo" width="128"></p>
+
 <div align="center">
 
 # ✨ MDViewer
